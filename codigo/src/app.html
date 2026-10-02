@@ -869,6 +869,19 @@ async function importarMovimentacoes(movs) {
   return novas.length;
 }
 
+/* Lançamentos vindos de um arquivo ainda não estão no Drive: voltam a ficar pendentes. */
+async function marcarPendentes(movs) {
+  const ids = new Set(movs.map(m => m?.id));
+  if (!db) { memoria.movimentacoes.forEach(m => { if (ids.has(m.id)) m.sincronizado = 0; }); return; }
+  await tx('movimentacoes', 'readwrite', t => {
+    t.objectStore('movimentacoes').openCursor().onsuccess = ev => {
+      const c = ev.target.result; if (!c) return;
+      if (ids.has(c.value.id) && c.value.sincronizado) c.update({ ...c.value, sincronizado: 0 });
+      c.continue();
+    };
+  });
+}
+
 async function marcarSincronizadas(ids) {
   if (!db) { memoria.movimentacoes.forEach(m => { if (ids.has(m.id)) m.sincronizado = 1; }); return; }
   await tx('movimentacoes', 'readwrite', t => {
@@ -1821,6 +1834,13 @@ async function telaAjustes() {
         <button class="btn ghost" id="b-copiar">Copiar backup</button>
       </div>
       <pre class="backup" id="b-texto" hidden></pre>
+      <div class="discreto"><button type="button" class="mini" id="b-restaurar">Restaurar de um arquivo de backup</button>
+        · <button type="button" class="mini" id="b-colar">colar backup copiado</button>
+        <input type="file" id="b-arquivo" accept=".json,application/json" hidden></div>
+      <div class="stack" id="b-colar-box" hidden>
+        <textarea id="b-colar-txt" rows="4" placeholder="Cole aqui o texto do backup" aria-label="Texto do backup"></textarea>
+        <button type="button" class="btn ghost" id="b-colar-ok">Restaurar</button>
+      </div>
     </div>`;
   $('#form-ajustes').addEventListener('submit', async e => {
     e.preventDefault();
@@ -1873,6 +1893,20 @@ async function telaAjustes() {
     const a = document.createElement('a'); a.href = url; a.download = `backup-emprestimos-${hojeISO()}.json`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
+  $('#b-restaurar').onclick = () => $('#b-arquivo').click();
+  const restaurar = async texto => {
+    try {
+      const j = JSON.parse(texto);
+      if (j?.app !== 'controle-emprestimos' || !Array.isArray(j.movimentacoes)) throw new Error('formato');
+      const n = await importarMovimentacoes(j.movimentacoes);
+      await marcarPendentes(j.movimentacoes);
+      toast(n ? `${plural(n, 'lançamento restaurado', 'lançamentos restaurados')}` : 'Nada novo: tudo deste arquivo já estava aqui');
+      if (n) { agendarBackup(); recarregar(); }
+    } catch (_) { toast('Isto não é um backup do app'); }
+  };
+  $('#b-arquivo').onchange = async ev => { const f = ev.target.files?.[0]; if (f) await restaurar(await f.text()); ev.target.value = ''; };
+  $('#b-colar').onclick = () => { $('#b-colar-box').hidden = false; $('#b-colar-txt').focus(); };
+  $('#b-colar-ok').onclick = () => restaurar($('#b-colar-txt').value.trim());
   $('#b-copiar').onclick = () => {
     const txt = conteudo(); const pre = $('#b-texto');
     const mostrar = () => {
