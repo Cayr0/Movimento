@@ -1,0 +1,1911 @@
+<title>Controle de Empréstimos</title>
+<meta name="theme-color" content="#1f2328">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: uma coluna estreita de app de celular, cabeçalho grafite, barra de navegação fixa embaixo. */
+:root {
+  --bg: #f5f4ef;          /* papel */
+  --surface: #ffffff;
+  --ink: #1f2328;         /* grafite */
+  --muted: #5d6168;
+  --line: #dcdad2;
+  --accent: #f2b705;      /* amarelo de destaque */
+  --accent-ink: #1f2328;
+  --ok: #2f7d4f;
+  --warn: #b5541c;
+  --ok-bg: #e3f1e8;
+  --warn-bg: #fbe7dc;
+  --field: #fbfaf7;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a; --surface: #1e2125; --ink: #ecebe6; --muted: #a2a5ab; --line: #33373d;
+    --accent: #f5c32c; --accent-ink: #15171a; --ok: #6cc28f; --warn: #f0905a;
+    --ok-bg: #1d3226; --warn-bg: #3a251a; --field: #191b1f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171a; --surface: #1e2125; --ink: #ecebe6; --muted: #a2a5ab; --line: #33373d;
+  --accent: #f5c32c; --accent-ink: #15171a; --ok: #6cc28f; --warn: #f0905a;
+  --ok-bg: #1d3226; --warn-bg: #3a251a; --field: #191b1f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+.app { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 0 calc(150px + env(safe-area-inset-bottom, 0px)); }
+header.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); padding-block: 14px 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand svg { flex: none; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: .85rem; }
+.btn-back { background: none; border: 0; color: var(--ink); font: inherit; font-weight: 600; padding: 8px 0; cursor: pointer; }
+main { display: grid; gap: 16px; padding-block: 16px; }
+.banner { background: var(--warn-bg); color: var(--warn); border-radius: var(--r); padding: 12px 14px; font-size: .9rem; }
+.banner.ok { background: var(--ok-bg); color: var(--ok); }
+
+/* Lista */
+.list { display: grid; gap: 10px; }
+.loan {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 14px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%;
+}
+.loan:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.loan .who { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.loan .qty { white-space: nowrap; font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; font-variant-numeric: tabular-nums; text-align: right; }
+.loan .meta { color: var(--muted); font-size: .85rem; }
+.pill { justify-self: end; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); }
+.pill.vencido { background: var(--warn-bg); color: var(--warn); }
+.empty { text-align: center; padding: 32px 16px; color: var(--muted); border: 1.5px dashed var(--line); border-radius: var(--r); display: grid; gap: 12px; justify-items: center; }
+
+/* Formulário */
+form { display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+label { font-weight: 600; font-size: .9rem; }
+.hint { color: var(--muted); font-size: .8rem; }
+input {
+  font: inherit; color: var(--ink); background: var(--field); width: 100%; min-width: 0;
+  border: 1.5px solid var(--line); border-radius: 10px; padding: 12px; font-size: 16px;
+}
+textarea { font: inherit; color: var(--ink); background: var(--field); width: 100%; min-width: 0; border: 1.5px solid var(--line); border-radius: 10px; padding: 12px; font-size: 16px; min-height: 84px; resize: vertical; }
+textarea:focus { border-color: var(--ink); outline: none; }
+input[type=number], input.money { font-variant-numeric: tabular-nums; }
+input:focus { border-color: var(--ink); outline: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-size: .85rem; font-weight: 600; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.calc {
+  background: var(--ink); color: var(--bg); border-radius: var(--r); padding: 16px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.calc dt { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+.calc dd { margin: 2px 0 0; font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.calc dd small { font-family: var(--font-body); font-weight: 500; font-size: .8rem; opacity: .8; }
+.calc dd.hl { color: var(--accent); }
+.btn {
+  font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 14px 18px; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); font-size: 1rem;
+}
+.btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+.btn:disabled { opacity: .5; cursor: default; }
+.err { color: var(--warn); font-size: .85rem; }
+
+/* Accordion de juros */
+details.acc { background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r); }
+details.acc > summary { list-style: none; cursor: pointer; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; }
+details.acc > summary::-webkit-details-marker { display: none; }
+details.acc > summary .resumo { color: var(--muted); font-weight: 500; font-size: .85rem; text-align: right; }
+details.acc > summary::after { content: "▾"; color: var(--muted); transition: transform .15s; }
+details.acc[open] > summary::after { transform: rotate(180deg); }
+details.acc > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
+details.acc .acc-body { display: grid; gap: 14px; padding: 0 14px 14px; }
+
+/* Detalhe */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; }
+.kv { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin: 0; }
+.kv dt { color: var(--muted); font-size: .9rem; }
+.kv dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.log { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.log li { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 10px; }
+.log b { color: var(--ink); }
+
+/* Pessoa e recebimentos */
+.person { grid-template-columns: 1fr auto; }
+.person .count { color: var(--muted); font-size: .85rem; }
+.section-title { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-top: 4px; }
+.pill.quitado { background: var(--line); color: var(--muted); }
+.saldo { display: grid; gap: 4px; }
+.saldo .big { font-family: var(--font-display); font-weight: 800; font-size: 2rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ok); }
+.pay-form { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.inline-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.toggle { display: flex; gap: 12px; align-items: flex-start; font-weight: 500; }
+.toggle input { width: 22px; height: 22px; flex: none; margin: 2px 0 0; accent-color: var(--ink); }
+.log li.pag { border-left-color: var(--ok); }
+.log li.ren { border-left-color: var(--warn); }
+
+.parcelas { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.parc { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--field); border: 1px solid var(--line); }
+.parc .n { font-family: var(--font-display); font-weight: 800; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.parc .info { display: grid; min-width: 0; }
+.parc .info .sub { font-size: .8rem; }
+.parc .val { display: grid; justify-items: end; font-weight: 700; font-variant-numeric: tabular-nums; }
+.parc .tag { font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.parc.paga { opacity: .7; }
+.parc.paga .tag { color: var(--ok); }
+.parc.atrasada { background: var(--warn-bg); border-color: transparent; }
+.parc.atrasada .tag, .parc.atrasada .n { color: var(--warn); }
+.parc.parcial .tag { color: var(--ink); }
+
+.search { display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 0 12px; }
+.search:focus-within { border-color: var(--ink); }
+.search span { color: var(--muted); font-size: 1.2rem; }
+.search input { border: 0; background: transparent; padding: 12px 0; }
+.search input:focus { outline: none; }
+.kpis { display: grid; gap: 10px; }
+.kpi { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; text-align: left; width: 100%; font: inherit; color: inherit; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; }
+.kpi.hero { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.kpi .k-label { font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; opacity: .75; }
+.kpi .k-val { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.kpi.hoje { cursor: default; }
+.kpi.hero .k-val { color: var(--accent); font-size: 2rem; }
+.kpi .k-sub { font-size: .85rem; opacity: .8; }
+.kpi .k-go { grid-row: 1 / span 3; grid-column: 2; font-size: 1.2rem; opacity: .6; }
+.tx { list-style: none; margin: 0; padding: 0; display: grid; }
+.tx li > button, .tx li > div { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 10px 2px; cursor: pointer; }
+.tx li:last-child > * { border-bottom: 0; }
+.tx .t-nome { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.tx .t-val { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.tx .t-sub { color: var(--muted); font-size: .8rem; }
+.tx .t-sub2 { color: var(--muted); font-size: .8rem; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tx .in { color: var(--ok); }
+.tx .warn { color: var(--warn); }
+.tx-head { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 0 2px; }
+.tx5 li > button { grid-template-columns: 1fr auto auto; align-items: center; }
+.tx5 .t-val.r { min-width: 6.5em; }
+.chips.scroll { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+.chips.scroll .chip { flex: none; }
+
+/* Bloqueio */
+.lock { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
+body.travado { overflow: hidden; }
+.lock-box { width: 100%; max-width: 320px; display: grid; justify-items: center; gap: 12px; text-align: center; }
+.lock-sub { min-height: 1.2em; }
+.dots { display: flex; gap: 14px; height: 18px; align-items: center; }
+.dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); }
+.dots span.on { background: var(--ink); }
+.dots.shake { animation: shake .35s; }
+@keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.lock-err { min-height: 1.3em; }
+.keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px 22px; margin-top: 4px; }
+.keypad button { width: 72px; height: 72px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink);
+  font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; cursor: pointer; display: grid; place-items: center; }
+.keypad button:active { background: var(--line); }
+.keypad .k-alt { border-color: transparent; background: transparent; font-size: 1.3rem; }
+.lock-actions { display: grid; gap: 8px; width: 100%; margin-top: 8px; }
+
+/* Ações discretas e confirmação */
+.discreto { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: .8rem; text-align: center; padding-block: 4px 8px; }
+.mini { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: .8rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.log .mini { margin-left: 6px; font-size: .75rem; }
+.sheet { position: fixed; inset: 0; z-index: 90; background: rgb(0 0 0 / .45); display: grid; align-items: end; justify-items: center; }
+.sheet-box { width: 100%; max-width: 560px; background: var(--surface); border-radius: 18px 18px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; }
+.btn.perigo { background: var(--warn); color: #fff; }
+
+/* Navegação */
+nav.bottom {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+nav.bottom .inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; gap: 2px; }
+.tab .ic { font-size: 1.1rem; line-height: 1; }
+nav.bottom .tab { font-size: .72rem; padding: 6px 2px; min-width: 0; }
+.fab#tab-novo { position: fixed; z-index: 11; right: max(16px, calc(50% - 264px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: 58px; height: 58px; padding: 0; font-size: 2rem; line-height: 1; display: grid; place-items: center; }
+nav.bottom .tab .ic { display: block; }
+.tab[aria-current="page"] .ic { stroke-width: 2.4; }
+.btn-gear { background: none; border: 0; color: var(--muted); padding: 8px; margin-right: -8px; border-radius: 999px; cursor: pointer; display: grid; place-items: center; }
+.btn-gear:hover, .btn-gear[aria-current="page"] { color: var(--ink); }
+body.sem-nav nav.bottom, body.sem-nav #tab-novo { display: none; }
+body.sem-nav .app { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.tx .t-sub { white-space: nowrap; }
+.tab { background: none; border: 0; font: inherit; font-size: .8rem; font-weight: 600; color: var(--muted); display: grid; justify-items: center; gap: 2px; padding: 6px; cursor: pointer; }
+.tab[aria-current="page"] { color: var(--ink); }
+.fab { white-space: nowrap; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; font: inherit; font-weight: 800; padding: 12px 20px; cursor: pointer; box-shadow: 0 4px 14px rgb(0 0 0 / .18); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem; z-index: 20; max-width: calc(100% - 32px); }
+.stack { display: grid; gap: 10px; }
+pre.backup { max-height: 160px; overflow: auto; font-size: .7rem; background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px; white-space: pre-wrap; word-break: break-all; }
+@media (prefers-reduced-motion: no-preference) { .toast { animation: up .2s ease-out; } @keyframes up { from { opacity: 0; transform: translate(-50%, -8px); } } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand" id="brand">
+      <svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#f2b705"/><circle cx="32" cy="32" r="21" fill="none" stroke="#1f2328" stroke-width="2.5" opacity=".35"/><text x="32" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="22" fill="#1f2328">R$</text></svg>
+      <div><h1 id="title">Empréstimos</h1><div class="sub" id="subtitle">Controle de empréstimos</div></div>
+    </div>
+    <button class="btn-gear" id="btn-ajustes" data-go="ajustes" aria-label="Ajustes"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+  </header>
+  <main id="view" aria-live="polite"></main>
+</div>
+
+<nav class="bottom" aria-label="Navegação">
+  <div class="inner">
+    <button class="tab" id="tab-inicio" data-go="inicio"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/></svg>Início</button>
+    <button class="tab" id="tab-emprestimos" data-go="emprestimos"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.3c2.1.7 3.5 2.8 3.5 5.7"/></svg>Empréstimos</button>
+    <button class="tab" id="tab-historico" data-go="historico"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.3 5 7.8 4.5 3 4.5v14c4.8 0 7.3.5 9 2 1.7-1.5 4.2-2 9-2v-14c-4.8 0-7.3.5-9 2Z"/><path d="M12 6.5v14"/></svg>Histórico</button>
+  </div>
+  <button class="fab" id="tab-novo" data-go="novo" aria-label="Novo empréstimo">+</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+<div class="lock" id="lock" role="dialog" aria-modal="true" aria-label="Bloqueio" hidden></div>
+<div class="sheet" id="sheet" hidden></div>
+
+
+<script>
+/* =========================================================================
+   Banco local (IndexedDB) como LOG DE MOVIMENTAÇÕES (append-only).
+   Nada é apagado nem alterado: cada ação gera uma movimentação nova.
+   O estado atual (empréstimos, pessoas, saldos) é recalculado lendo o log.
+   Cada movimentação tem id único (UUID) e o campo `sincronizado`,
+   para que a sincronização com a nuvem envie apenas o que falta.
+   Valores em dinheiro são guardados em centavos (números inteiros).
+   ========================================================================= */
+const DB_NOME = 'controle-emprestimos';
+const DB_VERSAO = 1;
+const TIPOS = {
+  PESSOA_CRIADA: 'PESSOA_CRIADA',
+  EMPRESTIMO_CRIADO: 'EMPRESTIMO_CRIADO',
+  RECEBIMENTO: 'RECEBIMENTO',
+  DIVIDA_PARCELADA: 'DIVIDA_PARCELADA',
+  // Correções: nunca apagam o registro original, só gravam uma nova movimentação por cima.
+  EMPRESTIMO_EDITADO: 'EMPRESTIMO_EDITADO',
+  EMPRESTIMO_EXCLUIDO: 'EMPRESTIMO_EXCLUIDO',
+  RECEBIMENTO_EXCLUIDO: 'RECEBIMENTO_EXCLUIDO', // empréstimo único transformado em parcelado (fecha o antigo, abre um novo)
+};
+const PRAZOS = [15, 30, 60, 90];
+const PADROES = { jurosPct: 10, prazoDias: 30, multaDiaCentavos: 100, renovarJuros: true };
+
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+
+let db = null;
+let memoria = { movimentacoes: [], meta: {} }; // usado se o IndexedDB não estiver disponível
+
+function abrirBanco() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) return reject(new Error('sem indexedDB'));
+    const req = indexedDB.open(DB_NOME, DB_VERSAO);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      const mov = d.createObjectStore('movimentacoes', { keyPath: 'id' });
+      mov.createIndex('emprestimoId', 'emprestimoId');
+      mov.createIndex('pessoaId', 'pessoaId');
+      mov.createIndex('sincronizado', 'sincronizado');
+      mov.createIndex('registradoEm', 'registradoEm');
+      d.createObjectStore('meta', { keyPath: 'chave' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function tx(store, modo, fn) {
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(store, modo);
+    let out;
+    t.oncomplete = () => resolve(out);
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error);
+    out = fn(t);
+  });
+}
+
+async function lerTodas() {
+  if (!db) return [...memoria.movimentacoes];
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('movimentacoes').objectStore('movimentacoes').getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* Grava várias movimentações numa única transação (tudo ou nada). Só usa add(): nunca sobrescreve. */
+async function registrar(movs) {
+  const agora = new Date().toISOString();
+  const dispositivoId = await metaGet('dispositivoId');
+  const completas = movs.map((m, ordem) => ({ id: uuid(), registradoEm: agora, ordem, dispositivoId, sincronizado: 0, versao: 1, ...m }));
+  if (!db) { memoria.movimentacoes.push(...completas); return completas; }
+  await tx('movimentacoes', 'readwrite', t => { const s = t.objectStore('movimentacoes'); completas.forEach(m => s.add(m)); });
+  agendarBackup();
+  return completas;
+}
+
+async function metaGet(chave) {
+  if (!db) return memoria.meta[chave];
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('meta').objectStore('meta').get(chave);
+    req.onsuccess = () => resolve(req.result ? req.result.valor : undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function metaSet(chave, valor) {
+  if (!db) { memoria.meta[chave] = valor; return; }
+  await tx('meta', 'readwrite', t => t.objectStore('meta').put({ chave, valor }));
+}
+const INICIO_PADRAO = { hoje: true, emprestado: true, operacoes: true, receber: true, ultimos: true, qtdUltimos: 5 };
+async function configInicio() { try { return { ...INICIO_PADRAO, ...((await metaGet('telaInicial')) || {}) }; } catch (_) { return { ...INICIO_PADRAO }; } }
+async function padroes() {
+  return {
+    jurosPct: (await metaGet('jurosPadrao')) ?? PADROES.jurosPct,
+    prazoDias: (await metaGet('prazoPadrao')) ?? PADROES.prazoDias,
+    multaDiaCentavos: (await metaGet('multaDiaPadraoCentavos')) ?? PADROES.multaDiaCentavos,
+    renovarJuros: (await metaGet('renovarJuros')) ?? PADROES.renovarJuros,
+  };
+}
+
+/* ---------- Datas e dinheiro ---------- */
+const hojeISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const diaUTC = iso => { const [a, m, d] = iso.split('-').map(Number); return Date.UTC(a, m - 1, d); };
+const somarDias = (iso, dias) => new Date(diaUTC(iso) + Number(dias) * 864e5).toISOString().slice(0, 10);
+/* Soma meses mantendo o dia (31/01 + 1 mês = 28/02 ou 29/02). */
+function somarMeses(iso, meses) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const alvo = new Date(Date.UTC(a, m - 1 + meses, 1));
+  const ultimo = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  alvo.setUTCDate(Math.min(d, ultimo));
+  return alvo.toISOString().slice(0, 10);
+}
+const diasEntre = (de, ate) => Math.round((diaUTC(ate) - diaUTC(de)) / 864e5);
+const fmtData = iso => { if (!iso) return '—'; const [a, m, d] = iso.split('-'); return `${d}/${m}/${a}`; };
+const fmtNum = n => Number(n).toLocaleString('pt-BR');
+const fmtPct = n => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+const fmtR$ = centavos => (centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const centavosParaCampo = c => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false });
+const plural = (n, um, varios) => `${fmtNum(n)} ${n === 1 ? um : varios}`;
+/* Aceita "1.234,56", "1234,5", "1234.56" ou "50". Retorna centavos, ou null se vazio/inválido. */
+function lerReais(txt) {
+  let t = String(txt ?? '').trim().replace(/[R$\s]/g, '');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  const n = Number(t);
+  return isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+}
+
+/* ---------- Estado derivado do log ---------- */
+const normalizar = s => s.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
+
+function projetar(movs) {
+  const ordenadas = [...movs].sort((a, b) => a.registradoEm.localeCompare(b.registradoEm) || (a.ordem ?? 0) - (b.ordem ?? 0));
+  const pessoas = new Map();
+  const emprestimos = new Map();
+  for (const m of ordenadas) {
+    if (m.tipo === TIPOS.PESSOA_CRIADA) {
+      pessoas.set(m.pessoaId, { id: m.pessoaId, nome: m.dados.nome, chave: normalizar(m.dados.nome) });
+    } else if (m.tipo === TIPOS.EMPRESTIMO_CRIADO) {
+      emprestimos.set(m.emprestimoId, { id: m.emprestimoId, pessoaId: m.pessoaId, ...m.dados, criadoEm: m.registradoEm, movimentacoes: [], recebimentos: [] });
+    }
+    const e = m.emprestimoId && emprestimos.get(m.emprestimoId);
+    if (!e) continue;
+    e.movimentacoes.push(m);
+    if (m.tipo === TIPOS.DIVIDA_PARCELADA) e.renegociacao = { ...m.dados };
+    if (m.tipo === TIPOS.EMPRESTIMO_EDITADO) {
+      emprestimos.set(e.id, { id: e.id, pessoaId: m.pessoaId, origemEmprestimoId: e.origemEmprestimoId, ...m.dados,
+        criadoEm: e.criadoEm, editadoEm: m.registradoEm, movimentacoes: e.movimentacoes, recebimentos: e.recebimentos, renegociacao: e.renegociacao });
+    }
+    if (m.tipo === TIPOS.EMPRESTIMO_EXCLUIDO) e.excluido = true;
+    if (m.tipo === TIPOS.RECEBIMENTO_EXCLUIDO) e.recebimentos = e.recebimentos.filter(r => r.id !== m.dados.recebimentoId);
+    if (m.tipo === TIPOS.RECEBIMENTO) e.recebimentos.push({ id: m.id, data: m.dados.data, valorCentavos: m.dados.valorCentavos || 0, perdaoCentavos: m.dados.perdaoCentavos || 0, registradoEm: m.registradoEm });
+  }
+  for (const e of [...emprestimos.values()]) if (e.excluido) emprestimos.delete(e.id);
+  // Se o parcelamento de uma dívida foi excluído, a dívida original volta a ficar em aberto.
+  for (const e of emprestimos.values()) if (e.renegociacao && !emprestimos.has(e.renegociacao.novoEmprestimoId)) delete e.renegociacao;
+  return { pessoas, emprestimos };
+}
+
+/* ---------- Cálculos ---------- */
+function calcular({ valorCentavos, jurosPct, jurosManualCentavos, dataEmprestimo, prazoDias }) {
+  const v = Math.max(0, valorCentavos || 0);
+  let juros, pct;
+  if (jurosManualCentavos !== null && jurosManualCentavos !== undefined) {
+    juros = Math.max(0, jurosManualCentavos);
+    pct = v > 0 ? (juros / v) * 100 : 0;
+  } else {
+    pct = Math.max(0, Number(jurosPct) || 0);
+    juros = Math.round(v * pct / 100);
+  }
+  const vencimento = dataEmprestimo && prazoDias !== '' ? somarDias(dataEmprestimo, Math.max(0, Math.floor(Number(prazoDias) || 0))) : '';
+  return { valorCentavos: v, jurosPct: Math.round(pct * 100) / 100, jurosCentavos: juros, totalPrevistoCentavos: v + juros, vencimento };
+}
+
+/* Extrato de um empréstimo de pagamento único até a data `ate`, dia a dia:
+   - depois do vencimento, enquanto houver saldo, soma o valor por dia vencido;
+   - se "renovar juros" estiver ligado, no dia seguinte a cada vencimento (o original e
+     os seguintes, a cada `prazo` dias) entram novos juros sobre o que falta (valor + juros, sem a diária);
+   - cada recebimento (e depois o valor perdoado) abate primeiro a diária, depois os juros e por último o valor emprestado. */
+function extrato(e, ate = hojeISO(), renovarPadrao = PADROES.renovarJuros) {
+  if (e.modalidade === 'parcelado') return extratoParcelado(e, ate);
+  const renovar = e.renovarJuros ?? renovarPadrao;
+  const prazo = Math.max(0, e.prazoDias || 0);
+  const pagamentos = ordenarPagamentos(e.recebimentos);
+  let sP = e.valorCentavos, sJ = e.jurosCentavos, sM = 0;
+  let jurosTotal = e.jurosCentavos, multaTotal = 0, recebido = 0, perdoado = 0, renovacoes = 0, quitadoEm = null, renegociado = false;
+  const eventos = [];
+  const abater = v => {
+    const aM = Math.min(v, sM); sM -= aM; v -= aM;
+    const aJ = Math.min(v, sJ); sJ -= aJ; v -= aJ;
+    const aP = Math.min(v, sP); sP -= aP;
+  };
+  const fim = ate < e.dataEmprestimo ? e.dataEmprestimo : ate;
+  let pi = 0;
+  for (let d = e.dataEmprestimo; d <= fim; d = somarDias(d, 1)) {
+    if (d > e.vencimento && sP + sJ + sM > 0) {
+      sM += e.multaDiaCentavos || 0; multaTotal += e.multaDiaCentavos || 0;
+      const aposVenc = diasEntre(e.vencimento, d) - 1;
+      if (renovar && prazo > 0 && e.jurosPct > 0 && aposVenc % prazo === 0) {
+        const base = sP + sJ;
+        const novos = Math.round(base * e.jurosPct / 100);
+        if (novos > 0) { sJ += novos; jurosTotal += novos; renovacoes++; eventos.push({ tipo: 'renovacao', data: d, valorCentavos: novos, base }); }
+      }
+    }
+    while (pi < pagamentos.length && pagamentos[pi].data <= d) {
+      const p = pagamentos[pi++];
+      abater(p.valorCentavos); abater(p.perdaoCentavos);
+      recebido += p.valorCentavos; perdoado += p.perdaoCentavos;
+      eventos.push({ tipo: 'recebimento', ...p });
+      if (sP + sJ + sM === 0 && !quitadoEm) quitadoEm = p.data;
+    }
+    if (quitadoEm) break;
+    if (e.renegociacao && d === e.renegociacao.data) { renegociado = true; break; }
+  }
+  if (renegociado) {
+    return {
+      saldoCentavos: 0, emAtrasoCentavos: 0, transferidoCentavos: sP + sJ + sM, jurosTotal, multaTotal, recebido, perdoado, renovacoes,
+      quitadoEm: e.renegociacao.data, diasVencidos: 0, proximoVencimento: e.vencimento, parcelasAtrasadas: 0,
+      devidoTotal: e.valorCentavos + jurosTotal + multaTotal, situacao: 'renegociado', eventos,
+    };
+  }
+  const saldo = sP + sJ + sM;
+  const diasVencidos = saldo > 0 ? Math.max(0, diasEntre(e.vencimento, ate)) : 0;
+  const proximoVencimento = renovar && prazo > 0 && diasVencidos > 0
+    ? somarDias(e.vencimento, Math.ceil(diasVencidos / prazo) * prazo) : e.vencimento;
+  return {
+    saldoCentavos: saldo, emAtrasoCentavos: diasVencidos > 0 ? saldo : 0,
+    jurosTotal, multaTotal, recebido, perdoado, renovacoes, quitadoEm, diasVencidos, proximoVencimento,
+    devidoTotal: e.valorCentavos + jurosTotal + multaTotal, parcelasAtrasadas: 0,
+    situacao: saldo === 0 ? 'quitado' : diasVencidos > 0 ? 'vencido' : 'ativo', eventos,
+  };
+}
+
+const ordenarPagamentos = recs => [...recs].sort((a, b) => a.data.localeCompare(b.data) || a.registradoEm.localeCompare(b.registradoEm));
+
+/* Extrato de um empréstimo parcelado: parcelas mensais a partir da 1ª.
+   Cada parcela vencida e não paga soma o valor por dia (diária por parcela).
+   Recebimentos e perdões quitam sempre a parcela mais antiga em aberto (primeiro a diária dela, depois o valor). */
+function extratoParcelado(e, ate = hojeISO()) {
+  const parcelas = Array.from({ length: e.numeroParcelas }, (_, i) => ({
+    numero: i + 1, vencimento: somarMeses(e.primeiraParcela, i),
+    valorCentavos: e.valorParcelaCentavos + (i === e.numeroParcelas - 1 ? e.ajusteUltimaCentavos || 0 : 0),
+    multaCentavos: 0, pagoCentavos: 0, quitadaEm: null,
+  }));
+  const aberto = p => p.valorCentavos + p.multaCentavos - p.pagoCentavos;
+  const pagamentos = ordenarPagamentos(e.recebimentos);
+  let multaTotal = 0, recebido = 0, perdoado = 0, quitadoEm = null;
+  const eventos = [];
+  const abater = (v, d) => {
+    for (const p of parcelas) {
+      if (v <= 0) break;
+      const a = Math.min(v, aberto(p)); if (a <= 0) continue;
+      p.pagoCentavos += a; v -= a;
+      if (aberto(p) === 0) p.quitadaEm = d;
+    }
+  };
+  const fim = ate < e.dataEmprestimo ? e.dataEmprestimo : ate;
+  let pi = 0;
+  for (let d = e.dataEmprestimo; d <= fim; d = somarDias(d, 1)) {
+    for (const p of parcelas) {
+      if (p.vencimento < d && aberto(p) > 0) { p.multaCentavos += e.multaDiaCentavos || 0; multaTotal += e.multaDiaCentavos || 0; }
+    }
+    while (pi < pagamentos.length && pagamentos[pi].data <= d) {
+      const p = pagamentos[pi++];
+      abater(p.valorCentavos, p.data); abater(p.perdaoCentavos, p.data);
+      recebido += p.valorCentavos; perdoado += p.perdaoCentavos;
+      eventos.push({ tipo: 'recebimento', ...p });
+    }
+    if (parcelas.every(p => aberto(p) === 0)) { quitadoEm = d; break; }
+  }
+  for (const p of parcelas) {
+    p.abertoCentavos = aberto(p);
+    p.situacao = p.abertoCentavos === 0 ? 'paga' : p.vencimento < ate ? 'atrasada' : p.pagoCentavos > 0 ? 'parcial' : 'aberta';
+    p.diasAtraso = p.situacao === 'atrasada' ? diasEntre(p.vencimento, ate) : 0;
+  }
+  const atrasadas = parcelas.filter(p => p.situacao === 'atrasada');
+  const proxima = parcelas.find(p => p.abertoCentavos > 0);
+  const saldo = parcelas.reduce((s, p) => s + p.abertoCentavos, 0);
+  return {
+    parcelas, saldoCentavos: saldo, emAtrasoCentavos: atrasadas.reduce((s, p) => s + p.abertoCentavos, 0),
+    jurosTotal: e.jurosCentavos, multaTotal, recebido, perdoado, renovacoes: 0, quitadoEm,
+    diasVencidos: atrasadas.length ? atrasadas[0].diasAtraso : 0, parcelasAtrasadas: atrasadas.length,
+    pagas: parcelas.filter(p => p.situacao === 'paga').length,
+    proximaParcela: proxima, proximoVencimento: proxima ? proxima.vencimento : e.vencimento,
+    devidoTotal: e.totalPrevistoCentavos + multaTotal,
+    situacao: saldo === 0 ? 'quitado' : atrasadas.length ? 'vencido' : 'ativo', eventos,
+  };
+}
+const fechado = x => x.situacao === 'quitado' || x.situacao === 'renegociado';
+const pillHTML = x => x.situacao === 'quitado' ? '<span class="pill quitado">Quitado</span>'
+  : x.situacao === 'renegociado' ? '<span class="pill quitado">Parcelado</span>'
+  : x.parcelasAtrasadas > 1 ? `<span class="pill vencido">${x.parcelasAtrasadas} parcelas atrasadas</span>`
+  : x.situacao === 'vencido' ? `<span class="pill vencido">${x.parcelasAtrasadas ? 'Parcela atrasada' : 'Vencido'} · ${plural(x.diasVencidos, 'dia', 'dias')}</span>`
+  : '<span class="pill">Em dia</span>';
+
+/* ---------- Interface ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let estado = { tela: 'inicio' };
+let pilha = []; // telas anteriores, para o botão Voltar
+let avisoArmazenamento = '';
+let renovarPadrao = PADROES.renovarJuros;
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2600);
+}
+
+function cabecalho(titulo, sub, voltar) {
+  $('#title').textContent = titulo;
+  $('#subtitle').textContent = sub;
+  const brand = $('#brand');
+  let btn = document.getElementById('btn-voltar');
+  if (voltar && !btn) {
+    btn = document.createElement('button');
+    btn.id = 'btn-voltar'; btn.className = 'btn-back'; btn.textContent = '← Voltar';
+    btn.onclick = voltarTela;
+    brand.parentElement.insertBefore(btn, $('#btn-ajustes'));
+  } else if (!voltar && btn) btn.remove();
+  $('#btn-ajustes').hidden = !!voltar;
+  document.body.classList.toggle('sem-nav', estado.tela === 'novo');
+  document.querySelectorAll('[data-go]').forEach(el => el.toggleAttribute('aria-current', false));
+  const atual = document.querySelector(`[data-go="${estado.tela}"]`);
+  if (atual) atual.setAttribute('aria-current', 'page');
+}
+
+function voltarTela() {
+  const anterior = pilha.pop();
+  if (!anterior) return ir('inicio', {}, { raiz: true });
+  return ir(anterior.tela, anterior, { semPilha: true });
+}
+
+/* opts.raiz: aba do menu (zera o Voltar). opts.semPilha: voltando. opts.substituir: troca a tela atual. */
+async function ir(tela, extra = {}, opts = {}) {
+  if (opts.raiz) pilha = [];
+  else if (!opts.semPilha && !opts.substituir) pilha.push(estado);
+  estado = { ...extra, tela };
+  window.scrollTo(0, 0);
+  try { renovarPadrao = (await metaGet('renovarJuros')) ?? PADROES.renovarJuros; } catch (_) {}
+  if (tela === 'inicio') return telaHome();
+  if (tela === 'emprestimos') return telaEmprestimos();
+  if (tela === 'historico') return telaHistorico(extra.filtro);
+  if (tela === 'novo') return telaNovo(extra.editarId);
+  if (tela === 'pessoa') return telaPessoa(extra.pessoaId);
+  if (tela === 'detalhe') return telaDetalhe(extra.emprestimoId);
+  if (tela === 'ajustes') return telaAjustes();
+}
+
+async function dadosAtuais() {
+  const { pessoas, emprestimos } = projetar(await lerTodas());
+  const hoje = hojeISO();
+  const lista = [...emprestimos.values()].map(e => ({ e, x: extrato(e, hoje, renovarPadrao), nome: pessoas.get(e.pessoaId)?.nome ?? e.nomePessoa }));
+  return { pessoas, emprestimos, lista };
+}
+
+/* ---------- Bloqueio por PIN e digital ----------
+   O PIN é guardado só como hash (PBKDF2). A digital usa a biometria do próprio celular (WebAuthn);
+   o app só recebe "confirmado" ou "não confirmado", nunca a digital em si. */
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const deB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const aleatorio = n => crypto.getRandomValues(new Uint8Array(n));
+const pinSuportado = () => !!(window.crypto && crypto.subtle);
+async function hashPin(pin, saltB64) {
+  const chave = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: deB64(saltB64), iterations: 150000 }, chave, 256);
+  return b64(bits);
+}
+async function seguranca() { try { return (await metaGet('seguranca')) || null; } catch (_) { return null; } }
+async function conferirPin(pin) { const s = await seguranca(); return !!s && (await hashPin(pin, s.salt)) === s.hash; }
+async function digitalDisponivel() {
+  try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (_) { return false; }
+}
+async function registrarDigital() {
+  const cred = await navigator.credentials.create({ publicKey: {
+    challenge: aleatorio(32), rp: { name: 'Controle de Empréstimos' },
+    user: { id: aleatorio(16), name: 'dono', displayName: 'Dono do app' },
+    pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
+    timeout: 60000,
+  } });
+  return b64(cred.rawId);
+}
+async function verificarDigital(credId) {
+  const r = await navigator.credentials.get({ publicKey: {
+    challenge: aleatorio(32), allowCredentials: [{ type: 'public-key', id: deB64(credId) }], userVerification: 'required', timeout: 60000,
+  } });
+  return !!r;
+}
+
+/* Teclado de PIN em tela cheia. tamanho: número fixo de dígitos (desbloqueio) ou null (criar: 4 a 6).
+   validar(pin) → true/false/'texto de erro'. Resolve com o PIN aceito, ou null se cancelar. */
+function teclado({ titulo, sub = '', tamanho = null, validar = () => true, cancelavel = true, digital = null, extra = null }) {
+  return new Promise(resolve => {
+    const el = $('#lock');
+    let pin = '', ocupado = false;
+    const max = tamanho || 6;
+    el.innerHTML = `
+      <div class="lock-box">
+        <svg width="44" height="44" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#f2b705"/><text x="32" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="22" fill="#1f2328">R$</text></svg>
+        <h2>${esc(titulo)}</h2>
+        <div class="sub lock-sub">${esc(sub)}</div>
+        <div class="dots" aria-hidden="true">${Array.from({ length: max }, () => '<span></span>').join('')}</div>
+        <div class="err lock-err" role="alert"></div>
+        <div class="keypad">
+          ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button type="button" data-k="${n}">${n}</button>`).join('')}
+          ${digital ? `<button type="button" data-k="bio" aria-label="Usar digital" class="k-alt"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 11v3a7 7 0 0 1-1.5 4.3"/><path d="M8.5 11a3.5 3.5 0 0 1 7 0v2.5a10 10 0 0 1-.9 4.2"/><path d="M5.6 15.5A10 10 0 0 0 6 11a6 6 0 0 1 9-5.2"/><path d="M18 8.6A6 6 0 0 1 18.5 11v1.5"/><path d="M3.5 12V11a8.5 8.5 0 0 1 12.8-7.3"/></svg></button>` : '<span></span>'}
+          <button type="button" data-k="0">0</button>
+          <button type="button" data-k="del" aria-label="Apagar" class="k-alt">⌫</button>
+        </div>
+        <div class="lock-actions">
+          ${tamanho ? '' : '<button type="button" class="btn" data-k="ok" disabled>Continuar</button>'}
+          ${cancelavel ? '<button type="button" class="btn ghost" data-k="cancel">Cancelar</button>' : ''}
+          ${extra ? `<button type="button" class="mini" data-k="extra">${esc(extra.rotulo)}</button>` : ''}
+        </div>
+      </div>`;
+    el.hidden = false;
+    document.body.classList.add('travado');
+    const pintar = () => {
+      el.querySelectorAll('.dots span').forEach((d, i) => { d.classList.toggle('on', i < pin.length); d.hidden = !tamanho && i >= Math.max(4, pin.length + (pin.length < 6 ? 1 : 0)); });
+      const ok = el.querySelector('[data-k="ok"]'); if (ok) ok.disabled = pin.length < 4;
+    };
+    const fechar = v => { el.hidden = true; el.innerHTML = ''; document.body.classList.remove('travado'); document.removeEventListener('keydown', tecla); resolve(v); };
+    const erro = msg => {
+      el.querySelector('.lock-err').textContent = msg; pin = ''; pintar();
+      const d = el.querySelector('.dots'); d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+    };
+    const enviar = async () => {
+      if (ocupado) return; ocupado = true;
+      const r = await validar(pin);
+      ocupado = false;
+      if (r === true) fechar(pin); else erro(typeof r === 'string' ? r : 'PIN incorreto');
+    };
+    const usarDigital = async () => {
+      if (!digital || ocupado) return;
+      ocupado = true;
+      try { if (await digital()) return fechar('digital'); } catch (_) { el.querySelector('.lock-err').textContent = 'Digital não confirmada. Use o PIN.'; }
+      ocupado = false;
+    };
+    const usarExtra = async () => {
+      if (ocupado) return; ocupado = true;
+      try { if (await extra.acao()) return fechar('extra'); } catch (_) {}
+      ocupado = false; el.querySelector('.lock-err').textContent = extra.falha || 'Não deu certo.';
+    };
+    const apertar = k => {
+      if (k === 'cancel') return fechar(null);
+      if (k === 'bio') return usarDigital();
+      if (k === 'extra') return usarExtra();
+      if (k === 'ok') return pin.length >= 4 && enviar();
+      if (k === 'del') { pin = pin.slice(0, -1); return pintar(); }
+      if (pin.length >= max || ocupado) return;
+      pin += k; el.querySelector('.lock-err').textContent = ''; pintar();
+      if (tamanho && pin.length === tamanho) enviar();
+    };
+    const tecla = ev => {
+      if (/^[0-9]$/.test(ev.key)) apertar(ev.key);
+      else if (ev.key === 'Backspace') apertar('del');
+      else if (ev.key === 'Enter' && !tamanho) apertar('ok');
+      else if (ev.key === 'Escape' && cancelavel) apertar('cancel');
+    };
+    el.onclick = ev => { const b = ev.target.closest('[data-k]'); if (b && !b.disabled) apertar(b.dataset.k); };
+    document.addEventListener('keydown', tecla);
+    pintar();
+    if (digital) setTimeout(usarDigital, 300);
+  });
+}
+
+/* Pergunta de confirmação em tela (o navegador do preview não mostra confirm()). */
+function confirmar({ titulo, texto, botao = 'Confirmar' }) {
+  return new Promise(resolve => {
+    const el = $('#sheet');
+    el.innerHTML = `<div class="sheet-box" role="alertdialog" aria-modal="true" aria-labelledby="sh-t">
+      <h2 id="sh-t">${esc(titulo)}</h2><p class="sub" style="margin:0">${esc(texto)}</p>
+      <div class="row2"><button type="button" class="btn ghost" data-r="0">Cancelar</button><button type="button" class="btn perigo" data-r="1">${esc(botao)}</button></div></div>`;
+    el.hidden = false;
+    el.onclick = ev => {
+      const b = ev.target.closest('[data-r]');
+      if (!b && ev.target !== el) return;
+      el.hidden = true; el.innerHTML = ''; resolve(!!b && b.dataset.r === '1');
+    };
+    el.querySelector('[data-r="0"]').focus();
+  });
+}
+/* Pede PIN ou digital antes de uma ação sensível. Sem PIN cadastrado, a confirmação basta. */
+async function autenticar() {
+  const s = await seguranca();
+  if (!s) return true;
+  const r = await teclado({ titulo: 'Confirme com seu PIN', sub: 'Para excluir', tamanho: s.tamanho, validar: conferirPin,
+    digital: s.digitalId ? () => verificarDigital(s.digitalId) : null });
+  return r !== null;
+}
+
+let travado = false, erradas = 0, esperaAte = 0;
+async function desbloquear() {
+  const s = await seguranca();
+  if (!s || travado) return;
+  travado = true;
+  await teclado({
+    titulo: 'Digite seu PIN', sub: 'Controle de Empréstimos', tamanho: s.tamanho, cancelavel: false,
+    digital: s.digitalId ? () => verificarDigital(s.digitalId) : null,
+    extra: googleAtivo() && (await contaGoogle()) ? { rotulo: 'Esqueci o PIN', acao: recuperarPinPeloGoogle, falha: 'Não foi possível confirmar pela conta Google.' } : null,
+    validar: async pin => {
+      if (Date.now() < esperaAte) return `Muitas tentativas. Aguarde ${Math.ceil((esperaAte - Date.now()) / 1000)} segundos.`;
+      if (await conferirPin(pin)) { erradas = 0; return true; }
+      erradas++;
+      if (erradas >= 5) { erradas = 0; esperaAte = Date.now() + 30000; return 'Muitas tentativas. Aguarde 30 segundos.'; }
+      return 'PIN incorreto';
+    },
+  });
+  travado = false;
+}
+/* Volta a pedir o PIN se o app ficou mais de 1 minuto em segundo plano. */
+let saiuEm = 0;
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { saiuEm = Date.now(); return; }
+  if (saiuEm && Date.now() - saiuEm > 60000 && await seguranca()) desbloquear();
+});
+
+async function criarPin() {
+  if (!pinSuportado()) { toast('Este navegador não permite PIN'); return false; }
+  const novo = await teclado({ titulo: 'Crie um PIN', sub: 'De 4 a 6 números' });
+  if (!novo) return false;
+  const conf = await teclado({ titulo: 'Confirme o PIN', sub: 'Digite de novo', tamanho: novo.length, validar: p => p === novo || 'Os PINs não batem. Tente de novo.' });
+  if (!conf) return false;
+  const salt = b64(aleatorio(16));
+  const atual = await seguranca();
+  await metaSet('seguranca', { salt, hash: await hashPin(novo, salt), tamanho: novo.length, digitalId: atual?.digitalId || null });
+  return true;
+}
+async function confirmarPinAtual(titulo) {
+  const s = await seguranca();
+  return !!(await teclado({ titulo, sub: 'Digite o PIN atual', tamanho: s.tamanho, validar: conferirPin }));
+}
+
+/* ---------- Conta Google e backup no Google Drive ----------
+   Cada pessoa entra com a própria conta Google e o backup vai para um arquivo no Drive dela
+   (escopo drive.file: o app só enxerga os arquivos que ele mesmo criou). Não há servidor.
+   O arquivo guarda o log inteiro; juntar dois logs é unir pelas ids, então o mesmo arquivo
+   serve para restaurar num celular novo e para usar o app em mais de um aparelho. */
+const CONFIG = window.__CONFIG__ || {};
+const GOOGLE_ESCOPO = 'https://www.googleapis.com/auth/drive.file openid email';
+const ARQUIVO_BACKUP = 'Controle de Empréstimos - backup.json';
+const DRIVE = 'https://www.googleapis.com/drive/v3/files', DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+let tokenGoogle = null, gisCarregando = null, sincronizando = null, timerBackup = null;
+
+const googleAtivo = () => !!CONFIG.googleClientId;
+async function contaGoogle() { try { return (await metaGet('google')) || null; } catch (_) { return null; } }
+
+function carregarGIS() {
+  if (window.google?.accounts?.oauth2) return Promise.resolve(window.google.accounts.oauth2);
+  if (!gisCarregando) gisCarregando = new Promise((ok, falha) => {
+    const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = () => ok(window.google.accounts.oauth2);
+    s.onerror = () => { gisCarregando = null; s.remove(); falha(new Error('sem conexão com o Google')); };
+    document.head.appendChild(s);
+  });
+  return gisCarregando;
+}
+
+/* Token de acesso (vale 1 hora). Se a pessoa já autorizou, o Google devolve sem perguntar de novo. */
+async function tokenDoGoogle(email, { novo = false } = {}) {
+  if (!novo && tokenGoogle && tokenGoogle.expira > Date.now() + 60000) return tokenGoogle.valor;
+  const oauth2 = await carregarGIS();
+  return new Promise((ok, falha) => {
+    const cliente = oauth2.initTokenClient({
+      client_id: CONFIG.googleClientId, scope: GOOGLE_ESCOPO,
+      callback: r => {
+        if (r.error) return falha(new Error(r.error));
+        if (!oauth2.hasGrantedAllScopes(r, 'https://www.googleapis.com/auth/drive.file')) return falha(new Error('sem permissão no Drive'));
+        tokenGoogle = { valor: r.access_token, expira: Date.now() + (Number(r.expires_in) || 3600) * 1000 };
+        ok(r.access_token);
+      },
+      error_callback: e => falha(new Error(e?.type || 'cancelado')),
+    });
+    cliente.requestAccessToken(email ? { prompt: '', login_hint: email } : { prompt: 'select_account' });
+  });
+}
+
+async function googleApi(url, opcoes = {}) {
+  const r = await fetch(url, { ...opcoes, headers: { Authorization: `Bearer ${tokenGoogle?.valor}`, ...(opcoes.headers || {}) } });
+  if (r.status === 401) { tokenGoogle = null; throw new Error('token expirado'); }
+  if (!r.ok) throw new Error(`Google respondeu ${r.status}`);
+  return r;
+}
+
+async function emailDoGoogle() { return (await (await googleApi('https://openidconnect.googleapis.com/v1/userinfo')).json()).email; }
+
+async function arquivoNoDrive() {
+  const q = encodeURIComponent("appProperties has { key='app' and value='controle-emprestimos' } and trashed = false");
+  const r = await (await googleApi(`${DRIVE}?q=${q}&spaces=drive&orderBy=${encodeURIComponent('modifiedTime desc')}&fields=files(id)`)).json();
+  return r.files?.[0]?.id || null;
+}
+
+/* Acrescenta no celular as movimentações que só existem no backup. Usa add(): nunca sobrescreve. */
+async function importarMovimentacoes(movs) {
+  const validos = new Set(Object.values(TIPOS));
+  const temos = new Set((await lerTodas()).map(m => m.id));
+  const novas = movs.filter(m => m && typeof m.id === 'string' && validos.has(m.tipo) && typeof m.registradoEm === 'string' && !temos.has(m.id))
+    .map(m => ({ ...m, sincronizado: 1 }));
+  if (!novas.length) return 0;
+  if (!db) memoria.movimentacoes.push(...novas);
+  else await tx('movimentacoes', 'readwrite', t => { const s = t.objectStore('movimentacoes'); novas.forEach(m => s.add(m)); });
+  return novas.length;
+}
+
+async function marcarSincronizadas(ids) {
+  if (!db) { memoria.movimentacoes.forEach(m => { if (ids.has(m.id)) m.sincronizado = 1; }); return; }
+  await tx('movimentacoes', 'readwrite', t => {
+    t.objectStore('movimentacoes').openCursor().onsuccess = ev => {
+      const c = ev.target.result; if (!c) return;
+      if (ids.has(c.value.id) && !c.value.sincronizado) c.update({ ...c.value, sincronizado: 1 });
+      c.continue();
+    };
+  });
+}
+
+/* Junta o que está no Drive com o que está no celular e deixa os dois lados iguais. */
+async function sincronizarDrive() {
+  if (!googleAtivo()) return { ok: false, motivo: 'indisponível' };
+  if (sincronizando) await sincronizando.catch(() => {});
+  const conta = await contaGoogle();
+  if (!conta) return { ok: false, motivo: 'sem conta' };
+  sincronizando = (async () => {
+    try {
+      await tokenDoGoogle(conta.email);
+      const id = await arquivoNoDrive();
+      let remotas = [];
+      if (id) { const j = await (await googleApi(`${DRIVE}/${id}?alt=media`)).json(); remotas = Array.isArray(j?.movimentacoes) ? j.movimentacoes : []; }
+      const importadas = await importarMovimentacoes(remotas);
+      const locais = await lerTodas();
+      const noDrive = new Set(remotas.map(m => m?.id));
+      const enviadas = locais.filter(m => !noDrive.has(m.id)).length;
+      if (enviadas || !id) {
+        const corpo = JSON.stringify({ app: 'controle-emprestimos', conta: conta.email, exportadoEm: new Date().toISOString(),
+          movimentacoes: locais.map(({ sincronizado, ...m }) => m) });
+        if (id) await googleApi(`${DRIVE_UPLOAD}/${id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: corpo });
+        else {
+          const b = 'limite-' + uuid();
+          const meta = { name: ARQUIVO_BACKUP, mimeType: 'application/json', appProperties: { app: 'controle-emprestimos' } };
+          await googleApi(`${DRIVE_UPLOAD}?uploadType=multipart`, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${b}` },
+            body: `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${corpo}\r\n--${b}--` });
+        }
+      }
+      await marcarSincronizadas(new Set(locais.map(m => m.id)));
+      await metaSet('google', { ...conta, ultimoBackup: new Date().toISOString() });
+      return { ok: true, importadas, enviadas };
+    } catch (err) { console.warn('backup no Drive', err); return { ok: false, motivo: err.message }; }
+  })();
+  try { return await sincronizando; } finally { sincronizando = null; }
+}
+
+/* Chamado depois de cada lançamento. O toque que gerou o lançamento ainda vale para o Google, se precisar renovar o acesso. */
+function agendarBackup() {
+  if (!googleAtivo()) return;
+  clearTimeout(timerBackup);
+  timerBackup = setTimeout(() => sincronizarDrive(), 600);
+}
+
+async function entrarComGoogle() {
+  if (!googleAtivo()) { toast('O login com Google funciona no app publicado'); return false; }
+  try {
+    await tokenDoGoogle(null, { novo: true });
+    const email = await emailDoGoogle();
+    const antiga = await contaGoogle();
+    if (antiga && antiga.email !== email && (await lerTodas()).length && !(await confirmar({ titulo: 'Trocar de conta?',
+      texto: `Os lançamentos deste celular vão ser juntados ao backup de ${email}.`, botao: 'Juntar e continuar' }))) return false;
+    await metaSet('google', { email, conectadoEm: new Date().toISOString() });
+    const r = await sincronizarDrive();
+    toast(!r.ok ? 'Conta conectada, mas o backup falhou. Tente de novo em Ajustes.'
+      : r.importadas ? `Backup recuperado: ${plural(r.importadas, 'lançamento', 'lançamentos')}` : 'Conta conectada e backup feito');
+    return true;
+  } catch (err) { console.warn(err); toast('Não foi possível entrar com o Google'); return false; }
+}
+
+async function sairDoGoogle() {
+  try { if (tokenGoogle && window.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(tokenGoogle.valor, () => {}); } catch (_) {}
+  tokenGoogle = null;
+  await metaSet('google', null);
+}
+
+/* "Esqueci o PIN": confirma pela mesma conta Google e remove o PIN. */
+async function recuperarPinPeloGoogle() {
+  const conta = await contaGoogle();
+  if (!conta) return false;
+  await tokenDoGoogle(conta.email, { novo: true });
+  if ((await emailDoGoogle()) !== conta.email) throw new Error('outra conta');
+  await metaSet('seguranca', null);
+  toast('PIN removido. Crie um novo em Ajustes.');
+  return true;
+}
+
+const fmtQuando = iso => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca';
+
+/* ---------- Home e histórico ---------- */
+const fimDoMes = iso => somarDias(somarMeses(iso.slice(0, 8) + '01', 1), -1);
+const nomeMes = iso => new Date(diaUTC(iso)).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
+
+/* Todas as transações (empréstimos, recebimentos, parcelamentos), mais recentes primeiro. */
+function transacoes(lista) {
+  const tx = [];
+  for (const { e, nome } of lista) {
+    tx.push({ tipo: e.origemEmprestimoId ? 'parcelamento' : 'emprestimo', data: e.dataEmprestimo, ordem: e.criadoEm, nome, valor: e.valorCentavos, emprestimoId: e.id,
+      detalhe: e.modalidade === 'parcelado' ? `${e.numeroParcelas}× de ${fmtR$(e.valorParcelaCentavos)}` : `vence ${fmtData(e.vencimento)}` });
+    for (const r of e.recebimentos) tx.push({ tipo: 'recebimento', data: r.data, ordem: r.registradoEm, nome, valor: r.valorCentavos, perdao: r.perdaoCentavos, emprestimoId: e.id });
+  }
+  return tx.sort((a, b) => b.data.localeCompare(a.data) || b.ordem.localeCompare(a.ordem));
+}
+
+/* O que vence até o fim do mês (inclui o que já está atrasado). */
+function aReceberNoMes(lista, hoje = hojeISO()) {
+  const fim = fimDoMes(hoje), itens = [];
+  for (const { e, x, nome } of lista) {
+    if (fechado(x)) continue;
+    if (e.modalidade === 'parcelado') {
+      for (const p of x.parcelas) if (p.abertoCentavos > 0 && p.vencimento <= fim)
+        itens.push({ nome, vencimento: p.vencimento, valor: p.abertoCentavos, atrasado: p.vencimento < hoje, emprestimoId: e.id, detalhe: `parcela ${p.numero}/${e.numeroParcelas}` });
+    } else if (x.proximoVencimento <= fim) {
+      const atrasado = x.situacao === 'vencido';
+      itens.push({ nome, vencimento: atrasado ? e.vencimento : x.proximoVencimento, valor: x.saldoCentavos, atrasado, emprestimoId: e.id, detalhe: 'pagamento único' });
+    }
+  }
+  return itens.sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+}
+
+/* O que já deveria ter sido pago até hoje: vence hoje ou está atrasado (parcelas atrasadas somadas por empréstimo). */
+function aReceberHoje(lista, hoje = hojeISO()) {
+  const hojeItens = [], atrasos = new Map();
+  for (const i of aReceberNoMes(lista, hoje)) {
+    if (i.atrasado) {
+      const a = atrasos.get(i.emprestimoId);
+      if (a) { a.valor += i.valor; a.parcelas++; }
+      else atrasos.set(i.emprestimoId, { ...i, parcelas: 1 });
+    } else if (i.vencimento <= hoje) hojeItens.push(i);
+  }
+  const atrasados = [...atrasos.values()].sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+  return { hojeItens, atrasados, total: [...hojeItens, ...atrasados].reduce((s, i) => s + i.valor, 0) };
+}
+
+async function telaHome() {
+  cabecalho('Início', 'Controle de empréstimos');
+  const { lista } = await dadosAtuais();
+  const banner = avisoArmazenamento ? `<div class="banner">${esc(avisoArmazenamento)}</div>` : '';
+  if (!lista.length) {
+    $('#view').innerHTML = `${banner}
+      <div class="empty">
+        <h2>Nenhum empréstimo ainda</h2>
+        <p style="margin:0">Registre o primeiro para começar o controle. Os totais aparecem aqui.</p>
+        <button class="btn" data-go="novo">+ Novo empréstimo</button>
+        ${googleAtivo() && !(await contaGoogle()) ? '<button class="btn ghost" id="h-google">Já usa o app? Entrar com Google e recuperar</button>' : ''}
+      </div>`;
+    $('#h-google')?.addEventListener('click', async () => { if (await entrarComGoogle()) ir('inicio', {}, { raiz: true }); });
+    return;
+  }
+  const hoje = hojeISO(), inicio30 = somarDias(hoje, -29);
+  const originais = lista.filter(i => !i.e.origemEmprestimoId);
+  const totalEmprestado = originais.reduce((s, i) => s + i.e.valorCentavos, 0);
+  const emAberto = lista.filter(i => !fechado(i.x)).reduce((s, i) => s + i.x.saldoCentavos, 0);
+  const tx30 = transacoes(lista).filter(t => t.data >= inicio30 && t.data <= hoje);
+  const emp30 = tx30.filter(t => t.tipo === 'emprestimo').reduce((s, t) => s + t.valor, 0);
+  const rec30 = tx30.filter(t => t.tipo === 'recebimento').reduce((s, t) => s + t.valor, 0);
+  const mes = aReceberNoMes(lista, hoje);
+  const totalMes = mes.reduce((s, i) => s + i.valor, 0);
+  const atrasoMes = mes.filter(i => i.atrasado).reduce((s, i) => s + i.valor, 0);
+  const cfg = await configInicio();
+  const conta = googleAtivo() ? await contaGoogle() : null;
+  const pendentes = conta ? (await lerTodas()).filter(m => !m.sincronizado).length : 0;
+  const backupAtrasado = pendentes && (!conta.ultimoBackup || Date.now() - Date.parse(conta.ultimoBackup) > 864e5);
+  const rh = aReceberHoje(lista, hoje);
+  const diasAtraso = v => diasEntre(v, hoje);
+  const linhaHoje = (i, atraso) => `<li><button data-abrir="${i.emprestimoId}">
+      <span class="t-nome">${esc(i.nome)}</span><span class="t-val ${atraso ? 'warn' : ''}">${fmtR$(i.valor)}</span>
+      <span class="t-sub">${atraso && i.parcelas > 1 ? `${i.parcelas} parcelas` : i.detalhe}</span>
+      <span class="t-sub2 ${atraso ? 'warn' : ''}">${atraso ? `${plural(diasAtraso(i.vencimento), 'dia', 'dias')} de atraso` : 'vence hoje'}</span>
+    </button></li>`;
+  const ultimos = [...lista].sort((a, b) => b.e.dataEmprestimo.localeCompare(a.e.dataEmprestimo) || b.e.criadoEm.localeCompare(a.e.criadoEm)).slice(0, cfg.qtdUltimos);
+  const nada = !cfg.hoje && !cfg.emprestado && !cfg.operacoes && !cfg.receber && !cfg.ultimos;
+  $('#view').innerHTML = `${banner}
+    ${backupAtrasado ? `<div class="discreto" id="h-pend">${plural(pendentes, 'lançamento', 'lançamentos')} fora do backup · <button type="button" class="mini" id="h-enviar">enviar agora</button></div>` : ''}
+    <div class="kpis">
+      ${cfg.hoje ? `<div class="kpi hero hoje" id="k-hoje">
+        <span class="k-label">A receber hoje</span><span class="k-val">${fmtR$(rh.total)}</span>
+        <span class="k-sub">${rh.hojeItens.length || rh.atrasados.length ? [rh.hojeItens.length && plural(rh.hojeItens.length, 'vence hoje', 'vencem hoje'), rh.atrasados.length && `${rh.atrasados.length} em atraso`].filter(Boolean).join(' · ') : 'Ninguém precisa pagar hoje e não há atrasos.'}</span>
+      </div>
+      ${rh.hojeItens.length ? `<div class="card"><h2>Pagam hoje</h2><ul class="tx">${rh.hojeItens.map(i => linhaHoje(i, false)).join('')}</ul></div>` : ''}
+      ${rh.atrasados.length ? `<div class="card"><h2>Em atraso</h2><ul class="tx">${rh.atrasados.map(i => linhaHoje(i, true)).join('')}</ul></div>` : ''}` : ''}
+      ${nada ? '<div class="empty">Todos os quadros estão escondidos. Escolha o que mostrar em Ajustes, na engrenagem lá em cima.</div>' : ''}
+      ${cfg.emprestado ? `<button class="kpi" data-hist="emprestimos">
+        <span class="k-label">Total emprestado</span><span class="k-val">${fmtR$(totalEmprestado)}</span>
+        <span class="k-sub">${plural(originais.length, 'empréstimo', 'empréstimos')} · ${fmtR$(emAberto)} ainda a receber</span><span class="k-go" aria-hidden="true">›</span>
+      </button>` : ''}
+      ${cfg.operacoes ? `<button class="kpi" data-hist="30dias">
+        <span class="k-label">Operações nos últimos 30 dias</span><span class="k-val">${fmtNum(tx30.length)}</span>
+        <span class="k-sub">${fmtR$(emp30)} emprestados · ${fmtR$(rec30)} recebidos</span><span class="k-go" aria-hidden="true">›</span>
+      </button>` : ''}
+      ${cfg.receber ? `<button class="kpi" data-hist="areceber">
+        <span class="k-label">A receber em ${nomeMes(hoje)}</span><span class="k-val">${fmtR$(totalMes)}</span>
+        <span class="k-sub">${plural(mes.length, 'vencimento', 'vencimentos')}${atrasoMes ? ` · ${fmtR$(atrasoMes)} em atraso` : ''}</span><span class="k-go" aria-hidden="true">›</span>
+      </button>` : ''}
+    </div>
+    ${cfg.ultimos ? `<div class="card">
+      <h2>Últimos empréstimos</h2>
+      <div class="tx-head"><span>Nome</span><span>Emprestado</span><span style="min-width:6.5em;text-align:right">A receber</span></div>
+      <ul class="tx tx5">${ultimos.map(({ e, x, nome }) => `<li><button data-abrir="${e.id}">
+        <span class="t-nome">${esc(nome)}<br><span class="t-sub">${fmtData(e.dataEmprestimo)}</span></span>
+        <span class="t-val">${fmtR$(e.valorCentavos)}</span>
+        <span class="t-val r ${x.situacao === 'vencido' ? 'warn' : ''}">${x.situacao === 'quitado' ? '<span class="t-sub">Quitado</span>' : x.situacao === 'renegociado' ? '<span class="t-sub">Parcelado</span>' : fmtR$(x.saldoCentavos)}</span>
+      </button></li>`).join('')}</ul>
+      <button class="btn ghost" data-hist="tudo">Ver histórico completo</button>
+    </div>` : ''}`;
+  $('#h-enviar')?.addEventListener('click', async () => {
+    const r = await sincronizarDrive();
+    toast(r.ok ? 'Backup feito' : 'Não foi possível fazer o backup agora');
+    if (r.ok) ir('inicio', {}, { raiz: true });
+  });
+}
+
+/* CSV no formato do Excel brasileiro: ponto e vírgula, vírgula decimal, datas dd/mm/aaaa. Colunas "Valor"/"Perdoado" vêm em centavos. */
+function exportarCSV(nome, linhas) {
+  const cel = (v, col) => {
+    if (typeof v === 'number' && /Valor|Perdoado/.test(linhas[0][col])) return (v / 100).toFixed(2).replace('.', ',');
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return fmtData(v);
+    const t = String(v ?? '');
+    return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const txt = '\ufeff' + linhas.map((l, r) => l.map((v, c) => r ? cel(v, c) : v).join(';')).join('\r\n');
+  if (!window.__PWA__) {
+    // Na prévia o navegador não deixa baixar arquivos: copia o conteúdo.
+    navigator.clipboard?.writeText(txt).then(() => toast('CSV copiado. No app instalado ele é baixado como arquivo.'), () => toast('No app instalado o CSV é baixado como arquivo.'));
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([txt], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('CSV exportado');
+}
+
+async function telaHistorico(filtroInicial) {
+  cabecalho('Histórico', 'Transações', pilha.length > 0);
+  const { lista } = await dadosAtuais();
+  const hoje = hojeISO();
+  const f = { tipo: 'tudo', periodo: 'tudo', busca: '', ...(filtroInicial || {}) };
+  const TIPOS_F = [['tudo', 'Tudo'], ['emprestimos', 'Empréstimos'], ['recebimentos', 'Recebimentos'], ['areceber', 'A receber no mês']];
+  const PERIODOS = [['30dias', 'Últimos 30 dias'], ['mes', 'Este mês'], ['tudo', 'Desde o início']];
+  $('#view').innerHTML = `<div id="h-root" class="stack">
+    <div class="search"><span aria-hidden="true">⌕</span><input id="h-busca" type="search" placeholder="Buscar pessoa" autocomplete="off" aria-label="Buscar pessoa" value="${esc(f.busca)}"></div>
+    <div class="chips" role="group" aria-label="Tipo">${TIPOS_F.map(([k, r]) => `<button type="button" class="chip" data-ft="${k}">${r}</button>`).join('')}</div>
+    <div class="chips" role="group" aria-label="Período" id="h-periodos">${PERIODOS.map(([k, r]) => `<button type="button" class="chip" data-fp="${k}">${r}</button>`).join('')}</div>
+    <div class="card"><div class="sub" id="h-resumo"></div><ul class="tx" id="h-lista"></ul></div>
+    <div class="discreto"><button type="button" class="mini" id="h-csv">Exportar CSV</button></div></div>`;
+  const tx = transacoes(lista);
+  let csv = [];
+  const render = () => {
+    document.querySelectorAll('[data-ft]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.ft === f.tipo)));
+    document.querySelectorAll('[data-fp]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.fp === f.periodo)));
+    $('#h-periodos').hidden = f.tipo === 'areceber';
+    const t = normalizar(f.busca);
+    const casaNome = n => !t || normalizar(n).includes(t);
+    if (f.tipo === 'areceber') {
+      const itens = aReceberNoMes(lista, hoje).filter(i => casaNome(i.nome));
+      csv = [['Vencimento', 'Pessoa', 'Valor', 'Situação', 'Detalhe'],
+        ...itens.map(i => [i.vencimento, i.nome, i.valor, i.atrasado ? 'Atrasado' : 'A vencer', i.detalhe])];
+      const total = itens.reduce((s, i) => s + i.valor, 0), atraso = itens.filter(i => i.atrasado).reduce((s, i) => s + i.valor, 0);
+      $('#h-resumo').innerHTML = `<b>${fmtR$(total)}</b> a receber até ${fmtData(fimDoMes(hoje))}${atraso ? ` · <span class="warn">${fmtR$(atraso)} em atraso</span>` : ''}`;
+      $('#h-lista').innerHTML = itens.length ? itens.map(i => `<li><button data-abrir="${i.emprestimoId}">
+        <span class="t-nome">${esc(i.nome)}</span><span class="t-val ${i.atrasado ? 'warn' : ''}">${fmtR$(i.valor)}</span>
+        <span class="t-sub">${i.detalhe}</span><span class="t-sub2 ${i.atrasado ? 'warn' : ''}">${i.atrasado ? 'atrasado desde ' : 'vence '}${fmtData(i.vencimento)}</span>
+      </button></li>`).join('') : '<li><div class="t-sub">Nada a receber neste mês.</div></li>';
+      return;
+    }
+    const de = f.periodo === '30dias' ? somarDias(hoje, -29) : f.periodo === 'mes' ? hoje.slice(0, 8) + '01' : '0000-00-00';
+    const itens = tx.filter(i => i.data >= de && casaNome(i.nome) &&
+      (f.tipo === 'tudo' || (f.tipo === 'emprestimos' ? i.tipo !== 'recebimento' : i.tipo === 'recebimento')));
+    const emp = itens.filter(i => i.tipo === 'emprestimo').reduce((s, i) => s + i.valor, 0);
+    const rec = itens.filter(i => i.tipo === 'recebimento').reduce((s, i) => s + i.valor, 0);
+    const per = itens.filter(i => i.tipo === 'recebimento').reduce((s, i) => s + (i.perdao || 0), 0);
+    $('#h-resumo').innerHTML = `${plural(itens.length, 'operação', 'operações')}${emp ? ` · emprestado <b>${fmtR$(emp)}</b>` : ''}${rec ? ` · recebido <b>${fmtR$(rec)}</b>` : ''}${per ? ` · perdoado ${fmtR$(per)}` : ''}`;
+    const rotulo = { emprestimo: 'Empréstimo', parcelamento: 'Dívida parcelada', recebimento: 'Recebimento' };
+    csv = [['Data', 'Tipo', 'Pessoa', 'Valor', 'Perdoado', 'Detalhe'],
+      ...itens.map(i => [i.data, rotulo[i.tipo], i.nome, i.valor, i.perdao || 0, i.detalhe || ''])];
+    $('#h-lista').innerHTML = itens.length ? itens.map(i => `<li><button data-abrir="${i.emprestimoId}">
+      <span class="t-nome">${esc(i.nome)}</span>
+      <span class="t-val ${i.tipo === 'recebimento' ? 'in' : ''}">${i.tipo === 'recebimento' ? (i.valor ? `+ ${fmtR$(i.valor)}` : '—') : fmtR$(i.valor)}</span>
+      <span class="t-sub">${rotulo[i.tipo]}${i.detalhe ? ` · ${i.detalhe}` : ''}${i.perdao ? ` · perdoado ${fmtR$(i.perdao)}` : ''}</span>
+      <span class="t-sub2">${fmtData(i.data)}</span>
+    </button></li>`).join('') : '<li><div class="t-sub">Nenhuma operação com esses filtros.</div></li>';
+  };
+  $('#h-root').addEventListener('click', ev => {
+    const a = ev.target.closest('[data-ft]'); if (a) { f.tipo = a.dataset.ft; estado.filtro = { ...f }; render(); }
+    const b = ev.target.closest('[data-fp]'); if (b) { f.periodo = b.dataset.fp; estado.filtro = { ...f }; render(); }
+  });
+  $('#h-csv').addEventListener('click', () => {
+    if (csv.length < 2) return toast('Nada para exportar com esses filtros');
+    exportarCSV(`historico-emprestimos-${hoje}.csv`, csv);
+  });
+  $('#h-busca').addEventListener('input', ev => { f.busca = ev.target.value; estado.filtro = { ...f }; render(); });
+  estado.filtro = { ...f };
+  render();
+}
+
+async function telaEmprestimos() {
+  cabecalho('Empréstimos', 'Por pessoa');
+  const { lista, pessoas } = await dadosAtuais();
+  const banner = avisoArmazenamento ? `<div class="banner">${esc(avisoArmazenamento)}</div>` : '';
+  if (!lista.length) {
+    $('#view').innerHTML = `${banner}
+      <div class="empty">
+        <h2>Nenhum empréstimo ainda</h2>
+        <p style="margin:0">Registre o primeiro para começar o controle. Cada registro fica guardado no histórico.</p>
+        <button class="btn" data-go="novo">+ Novo empréstimo</button>
+      </div>`;
+    return;
+  }
+  // Agrupa por pessoa
+  const grupos = new Map();
+  for (const it of lista) {
+    if (!grupos.has(it.e.pessoaId)) grupos.set(it.e.pessoaId, { pessoaId: it.e.pessoaId, nome: it.nome, itens: [] });
+    grupos.get(it.e.pessoaId).itens.push(it);
+  }
+  const resumo = [...grupos.values()].map(g => {
+    const ativos = g.itens.filter(i => !fechado(i.x));
+    const vencidos = ativos.filter(i => i.x.situacao === 'vencido');
+    return { ...g, ativos, vencidos, aReceber: ativos.reduce((s, i) => s + i.x.saldoCentavos, 0), maiorAtraso: Math.max(0, ...vencidos.map(i => i.x.diasVencidos)) };
+  });
+  const comSaldo = resumo.filter(g => g.ativos.length).sort((a, b) => b.vencidos.length - a.vencidos.length || b.aReceber - a.aReceber);
+  const semSaldo = resumo.filter(g => !g.ativos.length).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const totalReceber = comSaldo.reduce((s, g) => s + g.aReceber, 0);
+  const card = g => {
+    const pill = g.vencidos.length > 1 ? `<span class="pill vencido">${g.vencidos.length} vencidos</span>` : g.vencidos.length ? pillHTML(g.vencidos[0].x)
+      : g.ativos.length ? '<span class="pill">Em dia</span>' : '<span class="pill quitado">Quitado</span>';
+    const alvo = g.ativos.length === 1 && g.itens.length === 1 ? `data-abrir="${g.ativos[0].e.id}"` : `data-pessoa="${g.pessoaId}"`;
+    return `<button class="loan person" ${alvo} data-busca="${esc(normalizar(g.nome))}">
+      <span class="who">${esc(g.nome)}</span>
+      <span class="qty">${fmtR$(g.aReceber)}</span>
+      <span class="count">${g.ativos.length ? plural(g.ativos.length, 'empréstimo ativo', 'empréstimos ativos') : plural(g.itens.length, 'empréstimo quitado', 'empréstimos quitados')}</span>
+      ${pill}
+    </button>`;
+  };
+  $('#view').innerHTML = `${banner}
+    <div class="saldo"><span class="section-title">Total a receber</span><span class="big">${fmtR$(totalReceber)}</span>
+      <span class="sub">${plural(comSaldo.length, 'pessoa', 'pessoas')} com saldo em aberto</span></div>
+    <div class="search"><span aria-hidden="true">⌕</span><input id="busca" type="search" placeholder="Buscar pessoa" autocomplete="off" aria-label="Buscar pessoa"></div>
+    <div class="list" id="lista-com">${comSaldo.map(card).join('')}</div>
+    ${semSaldo.length ? `<div class="section-title" id="titulo-sem">Sem saldo em aberto</div><div class="list" id="lista-sem">${semSaldo.map(card).join('')}</div>` : ''}
+    <div class="empty" id="busca-vazia" hidden>Ninguém encontrado com esse nome.</div>`;
+  $('#busca').addEventListener('input', ev => {
+    const t = normalizar(ev.target.value);
+    let visiveis = 0;
+    document.querySelectorAll('[data-busca]').forEach(c => { const ok = !t || c.dataset.busca.includes(t); c.hidden = !ok; if (ok) visiveis++; });
+    const sem = $('#lista-sem');
+    if (sem) $('#titulo-sem').hidden = ![...sem.children].some(c => !c.hidden);
+    $('#busca-vazia').hidden = visiveis > 0;
+  });
+}
+
+async function telaPessoa(pessoaId) {
+  const { lista, pessoas } = await dadosAtuais();
+  const itens = lista.filter(i => i.e.pessoaId === pessoaId);
+  const nome = pessoas.get(pessoaId)?.nome ?? itens[0]?.nome;
+  if (!itens.length) return ir('inicio', {}, { raiz: true });
+  cabecalho(nome, 'Empréstimos da pessoa', true);
+  const ativos = itens.filter(i => !fechado(i.x)).sort((a, b) => a.e.vencimento.localeCompare(b.e.vencimento));
+  const quitados = itens.filter(i => fechado(i.x)).sort((a, b) => b.x.quitadoEm.localeCompare(a.x.quitadoEm));
+  const aReceber = ativos.reduce((s, i) => s + i.x.saldoCentavos, 0);
+  const recebido = itens.reduce((s, i) => s + i.x.recebido, 0);
+  const linha = i => `<button class="loan" data-abrir="${i.e.id}">
+      <span class="who">${fmtR$(i.e.valorCentavos)} <span class="sub">em ${fmtData(i.e.dataEmprestimo)}</span></span>
+      <span class="qty">${fmtR$(i.x.saldoCentavos)}</span>
+      <span class="meta">${i.e.modalidade === 'parcelado' ? `${i.e.numeroParcelas}× de ${fmtR$(i.e.valorParcelaCentavos)} · ${i.x.pagas}/${i.e.numeroParcelas} pagas · ` : ''}${i.x.situacao === 'renegociado' ? `parcelado em ${fmtData(i.x.quitadoEm)}` : i.x.situacao === 'quitado' ? `quitado em ${fmtData(i.x.quitadoEm)}` : `vence ${fmtData(i.x.proximoVencimento)}`} · recebido ${fmtR$(i.x.recebido)}</span>
+      ${pillHTML(i.x)}
+    </button>`;
+  $('#view').innerHTML = `
+    <div class="card">
+      <div class="saldo"><span class="section-title">A receber de ${esc(nome)}</span><span class="big">${fmtR$(aReceber)}</span>
+      <span class="sub">${plural(ativos.length, 'empréstimo ativo', 'empréstimos ativos')} · já recebido ${fmtR$(recebido)}</span></div>
+    </div>
+    <div class="section-title">Ativos</div>
+    <div class="list">${ativos.length ? ativos.map(linha).join('') : '<div class="empty">Nenhum empréstimo ativo.</div>'}</div>
+    ${quitados.length ? `<details class="acc"><summary><span>Quitados</span><span class="resumo">${quitados.length}</span></summary><div class="acc-body list">${quitados.map(linha).join('')}</div></details>` : ''}`;
+}
+
+/* ---------- Bloco reutilizável de parcelamento (novo empréstimo e "Parcelar dívida") ----------
+   Juros simples ao mês: total = valor × (1 + juros% × parcelas). Parcela = total ÷ parcelas.
+   Se a parcela for digitada à mão, os juros ao mês se ajustam. */
+function htmlParcelas(px, pad) {
+  return `
+      <div class="row2">
+        <div class="field">
+          <label for="${px}-nparc">Número de parcelas</label>
+          <input id="${px}-nparc" type="number" inputmode="numeric" min="1" max="120" step="1" placeholder="Ex.: 14">
+        </div>
+        <div class="field">
+          <label for="${px}-vparc">Valor da parcela (R$)</label>
+          <input id="${px}-vparc" class="money" inputmode="decimal" autocomplete="off" placeholder="calculado">
+        </div>
+      </div>
+      <div class="field">
+        <label for="${px}-parc1">1ª parcela vence em</label>
+        <input id="${px}-parc1" type="date">
+        <div class="hint">As demais vencem todo mês no mesmo dia.</div>
+      </div>
+      <details class="acc" id="${px}-acc">
+        <summary><span>Juros e atraso</span><span class="resumo" id="${px}-resumo"></span></summary>
+        <div class="acc-body">
+          <div class="chips" role="group" aria-label="Juros rápidos">
+            <button type="button" class="chip" data-jp="0">Sem juros</button>
+            <button type="button" class="chip" data-jp="${pad.jurosPct}">Padrão (${fmtPct(pad.jurosPct)}% ao mês)</button>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label for="${px}-juros">Juros ao mês (%)</label>
+              <input id="${px}-juros" type="number" inputmode="decimal" min="0" step="0.5" value="${pad.jurosPct}">
+            </div>
+            <div class="field">
+              <label for="${px}-multa">Atraso por dia, por parcela (R$)</label>
+              <input id="${px}-multa" class="money" inputmode="decimal" autocomplete="off" value="${centavosParaCampo(pad.multaDiaCentavos)}">
+            </div>
+          </div>
+          <div class="hint">Os juros já vêm do padrão em Ajustes. Se você digitar o valor da parcela, os juros se ajustam.</div>
+        </div>
+      </details>`;
+}
+
+/* Liga os campos do bloco. getBase() devolve { valor (centavos), data (ISO) }. onChange recebe o cálculo. */
+function ligarParcelas(raiz, px, getBase, onChange) {
+  const el = id => raiz.querySelector(`#${px}-${id}`);
+  const nparc = el('nparc'), vparc = el('vparc'), parc1 = el('parc1'), juros = el('juros'), multa = el('multa');
+  let parcelaManual = null, parc1Manual = false;
+  const ler = () => {
+    const { valor } = getBase();
+    const n = Math.floor(Number(nparc.value) || 0);
+    let pct = Math.max(0, Number(juros.value) || 0), vp, total;
+    if (parcelaManual !== null && n) { vp = parcelaManual; total = vp * n; pct = valor ? Math.max(0, (total / valor - 1) / n * 100) : 0; }
+    else { total = n ? Math.round(valor * (1 + pct / 100 * n)) : 0; vp = n ? Math.round(total / n) : 0; }
+    const ajuste = total - vp * n; // centavos de arredondamento, somados à última parcela
+    return {
+      valor, n, vp, total, ajuste, juros: total - valor, jurosMensalPct: Math.round(pct * 100) / 100,
+      pctTotal: valor ? Math.round((total - valor) / valor * 10000) / 100 : 0,
+      primeira: parcel1Valor(), ultima: n && parc1.value ? somarMeses(parc1.value, n - 1) : '',
+      multaCentavos: lerReais(multa.value), multaTexto: multa.value,
+    };
+  };
+  const parcel1Valor = () => parc1.value;
+  const atualizar = (origem) => {
+    if (origem === 'vparc') parcelaManual = lerReais(vparc.value);
+    if (origem === 'juros' || origem === 'n') { if (origem === 'juros') parcelaManual = null; }
+    const { data } = getBase();
+    if (origem === 'parc1') parc1Manual = !!parc1.value;
+    if (!parc1Manual && data) parc1.value = somarMeses(data, 1); // segue a data do empréstimo até ser mudada à mão
+    const q = ler();
+    if (parcelaManual === null) { if (origem !== 'vparc') vparc.value = q.vp ? centavosParaCampo(q.vp) : ''; }
+    else juros.value = q.jurosMensalPct;
+    el('resumo').textContent = `${fmtPct(q.jurosMensalPct)}% ao mês · ${fmtR$(lerReais(multa.value) ?? 0)}/dia`;
+    raiz.querySelectorAll('[data-jp]').forEach(c => c.setAttribute('aria-pressed', String(Number(c.dataset.jp) === Number(juros.value))));
+    onChange && onChange(q);
+  };
+  nparc.addEventListener('input', () => atualizar('n'));
+  vparc.addEventListener('input', () => atualizar('vparc'));
+  juros.addEventListener('input', () => atualizar('juros'));
+  parc1.addEventListener('input', () => atualizar('parc1'));
+  multa.addEventListener('input', () => atualizar());
+  raiz.addEventListener('click', ev => { const c = ev.target.closest('[data-jp]'); if (c && raiz.contains(c)) { juros.value = c.dataset.jp; atualizar('juros'); } });
+  return { ler, atualizar, abrirAcc: () => (el('acc').open = true) };
+}
+function validarParcelas(q, dataBase) {
+  const problemas = [];
+  if (!q.n || q.n > 120) problemas.push('Informe o número de parcelas (1 a 120).');
+  if (!q.vp) problemas.push('Confira o valor da parcela.');
+  if (q.n && q.vp && q.total < q.valor) problemas.push('O total das parcelas não pode ser menor que o valor.');
+  if (!q.primeira) problemas.push('Informe quando vence a 1ª parcela.');
+  else if (dataBase && q.primeira < dataBase) problemas.push('A 1ª parcela não pode vencer antes da data do empréstimo.');
+  if (q.multaCentavos === null && q.multaTexto.trim() !== '') problemas.push('Confira o valor de atraso por dia.');
+  return problemas;
+}
+const dadosParcelado = q => ({
+  modalidade: 'parcelado', numeroParcelas: q.n, valorParcelaCentavos: q.vp, ajusteUltimaCentavos: q.ajuste, primeiraParcela: q.primeira, vencimento: q.ultima,
+  jurosMensalPct: q.jurosMensalPct, jurosPct: q.pctTotal, jurosCentavos: q.juros, totalPrevistoCentavos: q.total,
+  multaDiaCentavos: q.multaCentavos ?? 0, renovarJuros: false,
+});
+
+async function telaNovo(editarId) {
+  const { pessoas, emprestimos: todos } = projetar(await lerTodas());
+  const ed = editarId ? todos.get(editarId) : null;
+  cabecalho(ed ? 'Editar empréstimo' : 'Novo empréstimo', ed ? 'Corrija o que foi lançado errado' : 'Preencha os dados', true);
+  const pad = await padroes();
+  const nomes = [...pessoas.values()].map(p => p.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  $('#view').innerHTML = `
+    <form id="form-novo" novalidate>
+      <div class="field">
+        <span class="label" id="l-tipo"><b>Forma de pagamento</b></span>
+        <div class="chips" role="group" aria-labelledby="l-tipo">
+          <button type="button" class="chip" data-tipo="unico" aria-pressed="true">Pagamento único</button>
+          <button type="button" class="chip" data-tipo="parcelado" aria-pressed="false">Parcelado</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="f-nome">Nome de quem recebeu</label>
+        <input id="f-nome" name="nome" list="lista-pessoas" autocomplete="off" autocapitalize="words" required placeholder="Ex.: Maria Souza">
+        <datalist id="lista-pessoas">${nomes.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="f-valor">Valor emprestado (R$)</label>
+          <input id="f-valor" name="valor" class="money" inputmode="decimal" autocomplete="off" required placeholder="0,00">
+        </div>
+        <div class="field">
+          <label for="f-data">Data do empréstimo</label>
+          <input id="f-data" name="dataEmprestimo" type="date" value="${hojeISO()}" required>
+        </div>
+      </div>
+      <div id="sec-parc" class="stack" hidden>${htmlParcelas('np', pad)}
+      </div>
+      <div id="sec-unico" class="stack">
+      <div class="field">
+        <span class="label" id="l-prazo"><b>Prazo para devolução</b></span>
+        <input id="f-prazo" name="prazoDias" type="hidden" value="${pad.prazoDias}">
+        <div class="chips" role="group" aria-labelledby="l-prazo">${PRAZOS.map(d => `<button type="button" class="chip" data-prazo="${d}">${d} dias</button>`).join('')}<button type="button" class="chip" id="chip-outra">Outra data</button></div>
+        <div class="field" id="campo-outra" hidden>
+          <label for="f-venc">Data de vencimento</label>
+          <input id="f-venc" type="date">
+        </div>
+      </div>
+      <details class="acc" id="acc-juros">
+        <summary><span>Juros e atraso</span><span class="resumo" id="acc-resumo"></span></summary>
+        <div class="acc-body">
+          <div class="row2">
+            <div class="field">
+              <label for="f-juros">Juros (%)</label>
+              <input id="f-juros" name="jurosPct" type="number" inputmode="decimal" min="0" step="0.5" value="${pad.jurosPct}">
+            </div>
+            <div class="field">
+              <label for="f-juros-valor">Valor dos juros (R$)</label>
+              <input id="f-juros-valor" name="jurosValor" class="money" inputmode="decimal" autocomplete="off" placeholder="calculado">
+            </div>
+          </div>
+          <div class="hint">Os juros em reais são calculados pela porcentagem. Se você digitar o valor, a porcentagem se ajusta.</div>
+          <div class="field">
+            <label for="f-multa">Valor por dia vencido (R$)</label>
+            <input id="f-multa" name="multaDia" class="money" inputmode="decimal" autocomplete="off" value="${centavosParaCampo(pad.multaDiaCentavos)}">
+            <div class="hint">Somado ao saldo para cada dia depois do vencimento.</div>
+          </div>
+          <label class="toggle" for="f-renovar"><input type="checkbox" id="f-renovar" name="renovar" ${pad.renovarJuros ? 'checked' : ''}>
+            <span>Renovar juros se vencer sem quitar<br><span class="hint">A cada novo prazo, entram os juros de novo sobre o que falta.</span></span></label>
+        </div>
+      </details>
+      </div>
+      <details class="acc" id="acc-obs">
+        <summary><span>Observações</span><span class="resumo">opcional</span></summary>
+        <div class="acc-body"><textarea id="f-obs" name="observacoes" placeholder="Ex.: combinado pagar no dia 5"></textarea></div>
+      </details>
+      <dl class="calc" aria-live="polite">
+        <div><dt id="r-venc-t">Vencimento</dt><dd id="r-venc">—</dd></div>
+        <div><dt>Total previsto</dt><dd id="r-total" class="hl">R$ 0,00</dd></div>
+        <div id="r-juros-parc" hidden style="grid-column:1/-1"><dt>Juros embutidos</dt><dd id="r-juros-parc-v" style="font-size:1.05rem">—</dd></div>
+      </dl>
+      <div class="err" id="f-erro" role="alert" hidden></div>
+      <button class="btn" type="submit" id="f-salvar">Salvar empréstimo</button>
+    </form>`;
+
+  const f = $('#form-novo');
+  let tipo = 'unico';
+  let parc;
+  let outra = !PRAZOS.includes(Number(pad.prazoDias)); // "Outra data": o vencimento é escolhido no calendário
+  let jurosManual = null; // centavos digitados à mão, ou null quando calculado pela %
+  const ler = () => calcular({
+    valorCentavos: lerReais(f.valor.value), jurosPct: f.jurosPct.value, jurosManualCentavos: jurosManual,
+    dataEmprestimo: f.dataEmprestimo.value, prazoDias: f.prazoDias.value,
+  });
+  const atualizar = (origem) => {
+    if (origem === 'jurosValor') jurosManual = lerReais(f.jurosValor.value);
+    if (origem === 'juros') jurosManual = null;
+    const r = ler();
+    if (jurosManual === null) { if (origem !== 'jurosValor') f.jurosValor.value = r.valorCentavos ? centavosParaCampo(r.jurosCentavos) : ''; }
+    else f.jurosPct.value = r.jurosPct;
+    const multa = lerReais(f.multaDia.value) ?? 0;
+    $('#acc-resumo').textContent = `${fmtPct(r.jurosPct)}% · ${fmtR$(multa)}/dia`;
+    $('#r-venc').textContent = fmtData(r.vencimento);
+    $('#r-total').textContent = fmtR$(r.totalPrevistoCentavos);
+    if (outra && f.dataEmprestimo.value && r.vencimento) f.venc.value = r.vencimento;
+    document.querySelectorAll('[data-prazo]').forEach(c => c.setAttribute('aria-pressed', String(!outra && c.dataset.prazo === String(f.prazoDias.value))));
+    $('#chip-outra').setAttribute('aria-pressed', String(outra));
+    $('#campo-outra').hidden = !outra;
+    $('#sec-unico').hidden = tipo !== 'unico';
+    $('#sec-parc').hidden = tipo !== 'parcelado';
+    $('#r-juros-parc').hidden = tipo !== 'parcelado';
+    document.querySelectorAll('[data-tipo]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.tipo === tipo)));
+    if (tipo === 'parcelado') {
+      const q = parc.ler();
+      $('#r-venc-t').textContent = 'Última parcela';
+      $('#r-venc').textContent = fmtData(q.ultima);
+      $('#r-total').textContent = fmtR$(q.total);
+      $('#r-juros-parc-v').textContent = q.n && q.vp && q.valor ? `${fmtR$(q.juros)} (${fmtPct(q.jurosMensalPct)}% ao mês) · ${q.n}× de ${fmtR$(q.vp)}` : '—';
+    } else $('#r-venc-t').textContent = 'Vencimento';
+  };
+  parc = ligarParcelas($('#sec-parc'), 'np', () => ({ valor: lerReais(f.valor.value) ?? 0, data: f.dataEmprestimo.value }), () => atualizar('parc'));
+  f.valor.addEventListener('input', () => { atualizar('valor'); if (tipo === 'parcelado') parc.atualizar(); });
+  f.jurosPct.addEventListener('input', () => atualizar('juros'));
+  f.jurosValor.addEventListener('input', () => atualizar('jurosValor'));
+  f.multaDia.addEventListener('input', () => atualizar());
+  f.dataEmprestimo.addEventListener('input', () => {
+    if (outra && f.venc.value && f.dataEmprestimo.value) f.prazoDias.value = Math.max(0, diasEntre(f.dataEmprestimo.value, f.venc.value));
+    atualizar();
+    if (tipo === 'parcelado') parc.atualizar();
+  });
+  f.venc = $('#f-venc');
+  f.venc.addEventListener('input', () => {
+    if (!f.venc.value || !f.dataEmprestimo.value) return;
+    f.prazoDias.value = Math.max(0, diasEntre(f.dataEmprestimo.value, f.venc.value)); atualizar();
+  });
+  f.addEventListener('click', e => {
+    const c = e.target.closest('[data-prazo]'); if (c) { outra = false; f.prazoDias.value = c.dataset.prazo; atualizar(); }
+    if (e.target.closest('#chip-outra')) { outra = true; atualizar(); f.venc.focus(); }
+    const t = e.target.closest('[data-tipo]'); if (t) { tipo = t.dataset.tipo; atualizar(); if (tipo === 'parcelado') parc.atualizar(); }
+  });
+  atualizar();
+  if (ed) {
+    const dispara = (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    f.nome.value = pessoas.get(ed.pessoaId)?.nome ?? ed.nomePessoa;
+    f.valor.value = centavosParaCampo(ed.valorCentavos);
+    f.dataEmprestimo.value = ed.dataEmprestimo;
+    if (ed.observacoes) { f.observacoes.value = ed.observacoes; $('#acc-obs').open = true; }
+    if (ed.modalidade === 'parcelado') {
+      tipo = 'parcelado'; atualizar();
+      const px = id => $(`#np-${id}`);
+      px('nparc').value = ed.numeroParcelas;
+      px('juros').value = ed.jurosMensalPct ?? 0;
+      px('multa').value = centavosParaCampo(ed.multaDiaCentavos || 0);
+      parc.atualizar('juros');
+      dispara(px('parc1'), ed.primeiraParcela);
+      if (parc.ler().vp !== ed.valorParcelaCentavos) dispara(px('vparc'), centavosParaCampo(ed.valorParcelaCentavos));
+    } else {
+      f.prazoDias.value = ed.prazoDias;
+      outra = !PRAZOS.includes(Number(ed.prazoDias));
+      f.jurosPct.value = ed.jurosPct;
+      if (ed.jurosEditadoManualmente) { f.jurosValor.value = centavosParaCampo(ed.jurosCentavos); jurosManual = ed.jurosCentavos; }
+      f.multaDia.value = centavosParaCampo(ed.multaDiaCentavos || 0);
+      f.renovar.checked = ed.renovarJuros ?? true;
+      atualizar();
+    }
+    $('#f-salvar').textContent = 'Salvar alterações';
+  }
+
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const erro = $('#f-erro');
+    const nome = f.nome.value.trim().replace(/\s+/g, ' ');
+    const r = ler();
+    const q = parc.ler();
+    const multaDiaCentavos = lerReais(f.multaDia.value);
+    const problemas = [];
+    if (!nome) problemas.push('Informe o nome de quem recebeu.');
+    if (!r.valorCentavos) problemas.push('Informe o valor emprestado (maior que zero).');
+    if (!f.dataEmprestimo.value) problemas.push('Informe a data do empréstimo.');
+    if (f.dataEmprestimo.value > hojeISO()) problemas.push('A data do empréstimo não pode ser no futuro.');
+    if (tipo === 'parcelado') { const pp = validarParcelas(q, f.dataEmprestimo.value); if (pp.length) parc.abrirAcc && pp.some(t => t.includes('atraso')) && parc.abrirAcc(); problemas.push(...pp); }
+    if (tipo === 'unico' && f.prazoDias.value === '') problemas.push('Informe o prazo.');
+    if (tipo === 'unico' && outra && f.venc.value && f.venc.value < f.dataEmprestimo.value) problemas.push('O vencimento não pode ser antes da data do empréstimo.');
+    if (tipo === 'unico' && multaDiaCentavos === null && f.multaDia.value.trim() !== '') { problemas.push('Confira o valor por dia vencido.'); f.querySelector('#acc-juros').open = true; }
+    if (problemas.length) { erro.textContent = problemas.join(' '); erro.hidden = false; return; }
+    erro.hidden = true;
+    $('#f-salvar').disabled = true;
+    try {
+      const { pessoas } = projetar(await lerTodas());
+      let pessoa = [...pessoas.values()].find(p => p.chave === normalizar(nome));
+      const movs = [];
+      if (!pessoa) {
+        pessoa = { id: uuid(), nome };
+        movs.push({ tipo: TIPOS.PESSOA_CRIADA, pessoaId: pessoa.id, emprestimoId: null, dados: { nome } });
+      }
+      const emprestimoId = ed ? ed.id : uuid();
+      const tipoEvento = ed ? TIPOS.EMPRESTIMO_EDITADO : TIPOS.EMPRESTIMO_CRIADO;
+      const observacoes = f.observacoes.value.trim();
+      if (tipo === 'parcelado') movs.push({
+        tipo: tipoEvento, pessoaId: pessoa.id, emprestimoId,
+        dados: { nomePessoa: pessoa.nome, moeda: 'BRL', valorCentavos: q.valor, dataEmprestimo: f.dataEmprestimo.value, ...dadosParcelado(q), observacoes },
+      });
+      else movs.push({
+        tipo: tipoEvento, pessoaId: pessoa.id, emprestimoId,
+        dados: {
+          modalidade: 'unico',
+          nomePessoa: pessoa.nome, moeda: 'BRL', valorCentavos: r.valorCentavos, dataEmprestimo: f.dataEmprestimo.value,
+          prazoDias: Math.floor(Number(f.prazoDias.value)), vencimento: r.vencimento,
+          jurosPct: r.jurosPct, jurosCentavos: r.jurosCentavos, totalPrevistoCentavos: r.totalPrevistoCentavos,
+          jurosEditadoManualmente: jurosManual !== null,
+          multaDiaCentavos: multaDiaCentavos ?? 0,
+          renovarJuros: f.renovar.checked,
+          observacoes,
+        },
+      });
+      await registrar(movs);
+      toast(ed ? 'Alterações salvas' : 'Empréstimo salvo');
+      if (ed) pilha.pop(); // volta direto para a tela de onde o detalhe foi aberto
+      ir('detalhe', { emprestimoId }, { substituir: true });
+    } catch (err) {
+      erro.textContent = 'Não foi possível salvar. Tente de novo.'; erro.hidden = false;
+      $('#f-salvar').disabled = false;
+      console.error(err);
+    }
+  });
+}
+
+async function telaDetalhe(id) {
+  const { emprestimos, pessoas } = projetar(await lerTodas());
+  const e = emprestimos.get(id);
+  if (!e) return ir('inicio', {}, { raiz: true });
+  const parcelado = e.modalidade === 'parcelado';
+  const nome = pessoas.get(e.pessoaId)?.nome ?? e.nomePessoa;
+  const x = extrato(e, hojeISO(), renovarPadrao);
+  const pad = await padroes();
+  const renovar = e.renovarJuros ?? renovarPadrao;
+  const quitadoPct = x.devidoTotal ? Math.min(100, Math.round((x.recebido + x.perdoado) / x.devidoTotal * 100)) : 0;
+  cabecalho(nome, `Empréstimo de ${fmtData(e.dataEmprestimo)}`, true);
+  const abertura = parcelado
+    ? `<li><b>Empréstimo de ${fmtR$(e.valorCentavos)}</b> · ${fmtData(e.dataEmprestimo)}<br>${e.numeroParcelas}× de ${fmtR$(e.valorParcelaCentavos)}, 1ª parcela em ${fmtData(e.primeiraParcela)}</li>`
+    : `<li><b>Empréstimo de ${fmtR$(e.valorCentavos)}</b> · ${fmtData(e.dataEmprestimo)}<br>Juros de ${fmtPct(e.jurosPct)}% (${fmtR$(e.jurosCentavos)}), vencimento ${fmtData(e.vencimento)}</li>`;
+  const historico = [
+    { data: e.dataEmprestimo, ord: 0, html: abertura },
+    ...x.eventos.map(ev => ev.tipo === 'recebimento'
+      ? { data: ev.data, ord: 2, html: `<li class="pag"><b>${[ev.valorCentavos ? `Recebido ${fmtR$(ev.valorCentavos)}` : '', ev.perdaoCentavos ? `Perdoado ${fmtR$(ev.perdaoCentavos)}` : ''].filter(Boolean).join(' · ')}</b> · ${fmtData(ev.data)}${x.situacao !== 'renegociado' ? ` <button type="button" class="mini" data-excluir-rec="${ev.id}" aria-label="Excluir este recebimento">excluir</button>` : ''}</li>` }
+      : { data: ev.data, ord: 1, html: `<li class="ren"><b>Juros renovados ${fmtR$(ev.valorCentavos)}</b> · ${fmtData(ev.data)}<br>${fmtPct(e.jurosPct)}% sobre ${fmtR$(ev.base)} em aberto</li>` }),
+    ...(e.renegociacao ? [{ data: e.renegociacao.data, ord: 3, html: `<li class="ren"><b>Dívida parcelada</b> · ${fmtData(e.renegociacao.data)}<br>Saldo de ${fmtR$(e.renegociacao.saldoCentavos)} em ${e.renegociacao.numeroParcelas}× de ${fmtR$(e.renegociacao.valorParcelaCentavos)}</li>` }] : []),
+  ].sort((a, b) => b.data.localeCompare(a.data) || b.ord - a.ord);
+
+  const rotuloParcela = { paga: 'Paga', atrasada: 'Atrasada', parcial: 'Parcial', aberta: 'Em aberto' };
+  const listaParcelas = parcelado ? `
+    <div class="card">
+      <h2>Parcelas · ${x.pagas} de ${e.numeroParcelas} pagas</h2>
+      <ul class="parcelas">${x.parcelas.map(p => `
+        <li class="parc ${p.situacao}">
+          <span class="n">${p.numero}</span>
+          <span class="info"><b>${fmtData(p.vencimento)}</b><span class="sub">${p.situacao === 'paga' ? `paga em ${fmtData(p.quitadaEm)}`
+            : p.situacao === 'atrasada' ? `${plural(p.diasAtraso, 'dia', 'dias')} de atraso${p.multaCentavos ? ` · +${fmtR$(p.multaCentavos)}` : ''}${p.pagoCentavos ? ` · recebido ${fmtR$(p.pagoCentavos)}` : ''}`
+            : p.situacao === 'parcial' ? `recebido ${fmtR$(p.pagoCentavos)}` : fmtR$(p.valorCentavos)}</span></span>
+          <span class="val">${p.situacao === 'paga' ? fmtR$(p.valorCentavos + p.multaCentavos) : fmtR$(p.abertoCentavos)}<span class="tag">${rotuloParcela[p.situacao]}</span></span>
+        </li>`).join('')}</ul>
+    </div>` : '';
+
+  // Atalhos de valor no recebimento
+  const atalhos = [];
+  if (parcelado && x.parcelasAtrasadas > 1) atalhos.push(['Atrasado', x.emAtrasoCentavos]);
+  if (parcelado && x.proximaParcela) atalhos.push([`Parcela ${x.proximaParcela.numero}`, x.proximaParcela.abertoCentavos]);
+  atalhos.push(['Tudo', x.saldoCentavos]);
+  const unicos = atalhos.filter((a, i) => atalhos.findIndex(b => b[1] === a[1]) === i);
+
+  $('#view').innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="saldo"><span class="section-title">${x.situacao === 'quitado' ? 'Quitado' : x.situacao === 'renegociado' ? 'Dívida parcelada' : 'Falta receber'}</span><span class="big">${fmtR$(x.saldoCentavos)}</span></div>
+        ${pillHTML(x)}
+      </div>
+      ${x.emAtrasoCentavos && parcelado ? `<div class="banner">Em atraso hoje: <b>${fmtR$(x.emAtrasoCentavos)}</b> (${plural(x.parcelasAtrasadas, 'parcela', 'parcelas')}, com a diária)</div>` : ''}
+      <div class="bar" role="img" aria-label="${quitadoPct}% quitado"><span style="width:${quitadoPct}%"></span></div>
+      <div class="sub">Recebido: <b>${fmtR$(x.recebido)}</b>${x.perdoado ? ` · perdoado: <b>${fmtR$(x.perdoado)}</b>` : ''} · de ${fmtR$(x.devidoTotal)}</div>
+      ${x.situacao === 'renegociado' ? `<div class="banner ok">Em ${fmtData(e.renegociacao.data)} o saldo de <b>${fmtR$(x.transferidoCentavos)}</b> virou um parcelamento.</div><button class="btn ghost" data-abrir="${e.renegociacao.novoEmprestimoId}">Ver parcelamento</button>` : ''}
+      ${e.origemEmprestimoId ? `<button class="btn ghost" data-abrir="${e.origemEmprestimoId}">Ver empréstimo de origem</button>` : ''}
+      ${!fechado(x) ? '<button class="btn" id="b-receber">Registrar recebimento</button>' : ''}
+      ${!fechado(x) && !parcelado ? '<button class="btn ghost" id="b-parcelar">Parcelar dívida</button>' : ''}
+      <form class="pay-form" id="form-receber" novalidate hidden>
+        <div class="row2">
+          <div class="field"><label for="p-valor">Valor recebido (R$)</label><input id="p-valor" class="money" inputmode="decimal" autocomplete="off" placeholder="0,00"></div>
+          <div class="field"><label for="p-data">Data</label><input id="p-data" type="date" value="${hojeISO()}" min="${e.dataEmprestimo}" max="${hojeISO()}"></div>
+        </div>
+        <div class="inline-actions">${unicos.map(([r, v]) => `<button type="button" class="chip" data-valor="${v}">${r} (${fmtR$(v)})</button>`).join('')}</div>
+        <div class="field">
+          <label for="p-perdao">Perdoar (R$)</label>
+          <input id="p-perdao" class="money" inputmode="decimal" autocomplete="off" placeholder="0,00">
+          <div class="hint">Abate da dívida sem contar como dinheiro recebido.</div>
+        </div>
+        <div class="err" id="p-erro" role="alert" hidden></div>
+        <div class="row2"><button type="button" class="btn ghost" id="p-cancelar">Cancelar</button><button type="submit" class="btn" id="p-salvar">Salvar</button></div>
+      </form>
+      ${!fechado(x) && !parcelado ? `<form class="pay-form" id="form-parcelar" novalidate hidden>
+        <h2>Parcelar dívida</h2>
+        <div class="sub">Saldo de hoje: <b>${fmtR$(x.saldoCentavos)}</b>. Ele vira um novo empréstimo parcelado, e este fica fechado no histórico. Se quiser perdoar parte antes, registre o perdão primeiro.</div>
+        ${htmlParcelas('rp', pad)}
+        <dl class="calc"><div><dt>Total</dt><dd id="rp-total" class="hl">—</dd></div><div><dt>Última parcela</dt><dd id="rp-ultima">—</dd></div>
+          <div style="grid-column:1/-1"><dt>Juros</dt><dd id="rp-juros-info" style="font-size:1.05rem">—</dd></div></dl>
+        <div class="err" id="rp-erro" role="alert" hidden></div>
+        <div class="row2"><button type="button" class="btn ghost" id="rp-cancelar">Cancelar</button><button type="submit" class="btn" id="rp-salvar">Parcelar</button></div>
+      </form>` : ''}
+    </div>
+    ${listaParcelas}
+    <div class="card">
+      <h2>Detalhes</h2>
+      <dl class="kv">
+        <dt>${e.origemEmprestimoId ? 'Dívida parcelada' : 'Valor emprestado'}</dt><dd>${fmtR$(e.valorCentavos)}</dd>
+        ${parcelado ? `
+        <dt>Parcelas</dt><dd>${e.numeroParcelas}× de ${fmtR$(e.valorParcelaCentavos)}</dd>
+        <dt>1ª e última</dt><dd>${fmtData(e.primeiraParcela)} a ${fmtData(e.vencimento)}</dd>
+        <dt>Juros embutidos (${fmtPct(e.jurosPct)}%)</dt><dd>${fmtR$(e.jurosCentavos)}</dd>
+        <dt>Atraso (${fmtR$(e.multaDiaCentavos)}/dia por parcela)</dt><dd>${fmtR$(x.multaTotal)}</dd>` : `
+        <dt>Prazo</dt><dd>${plural(e.prazoDias, 'dia', 'dias')}</dd>
+        <dt>Vencimento</dt><dd>${fmtData(e.vencimento)}</dd>
+        ${x.renovacoes ? `<dt>Próximo vencimento</dt><dd>${fmtData(x.proximoVencimento)}</dd>` : ''}
+        <dt>Juros (${fmtPct(e.jurosPct)}%)</dt><dd>${fmtR$(e.jurosCentavos)}</dd>
+        ${x.renovacoes ? `<dt>Juros renovados (${x.renovacoes}×)</dt><dd>${fmtR$(x.jurosTotal - e.jurosCentavos)}</dd>` : ''}
+        <dt>Atraso (${fmtR$(e.multaDiaCentavos)}/dia)</dt><dd>${fmtR$(x.multaTotal)}</dd>`}
+        <dt>Total devido</dt><dd>${fmtR$(x.devidoTotal)}</dd>
+        <dt>Recebido</dt><dd>${fmtR$(x.recebido)}</dd>
+        ${x.perdoado ? `<dt>Perdoado</dt><dd>${fmtR$(x.perdoado)}</dd>` : ''}
+        <dt><b>Falta receber</b></dt><dd><b>${fmtR$(x.saldoCentavos)}</b></dd>
+        ${parcelado ? '' : `<dt>Renovar juros</dt><dd>${renovar ? 'Sim' : 'Não'}</dd>`}
+      </dl>
+    </div>
+    ${e.observacoes ? `<div class="card"><h2>Observações</h2><p style="margin:0;white-space:pre-wrap">${esc(e.observacoes)}</p></div>` : ''}
+    <div class="card">
+      <h2>Histórico</h2>
+      <ul class="log">${historico.map(h => h.html).join('')}</ul>
+    </div>
+    <div class="discreto">${x.situacao === 'renegociado'
+      ? 'Para corrigir este empréstimo, exclua antes o parcelamento que saiu dele.'
+      : `<button type="button" class="mini" id="b-editar">Editar empréstimo</button><span aria-hidden="true">·</span><button type="button" class="mini" id="b-excluir">Excluir empréstimo</button>`}</div>`;
+  $('#b-editar')?.addEventListener('click', () => ir('novo', { editarId: e.id }));
+  $('#b-excluir')?.addEventListener('click', async () => {
+    const ok = await confirmar({ titulo: 'Excluir este empréstimo?', texto: `${nome} · ${fmtR$(e.valorCentavos)} em ${fmtData(e.dataEmprestimo)}. Ele e os recebimentos dele saem de todas as contas.${e.origemEmprestimoId ? ' A dívida original volta a ficar em aberto.' : ''}`, botao: 'Excluir' });
+    if (!ok || !(await autenticar())) return;
+    await registrar([{ tipo: TIPOS.EMPRESTIMO_EXCLUIDO, pessoaId: e.pessoaId, emprestimoId: e.id, dados: { motivo: 'excluido pelo usuário' } }]);
+    toast('Empréstimo excluído');
+    pilha = []; ir('emprestimos', {}, { raiz: true });
+  });
+  document.querySelectorAll('[data-excluir-rec]').forEach(b => b.addEventListener('click', async () => {
+    const r = e.recebimentos.find(r => r.id === b.dataset.excluirRec);
+    if (!r) return;
+    const desc = [r.valorCentavos ? `recebido ${fmtR$(r.valorCentavos)}` : '', r.perdaoCentavos ? `perdoado ${fmtR$(r.perdaoCentavos)}` : ''].filter(Boolean).join(' e ');
+    const ok = await confirmar({ titulo: 'Excluir este recebimento?', texto: `${fmtData(r.data)}: ${desc}. O saldo é recalculado sem ele.`, botao: 'Excluir' });
+    if (!ok || !(await autenticar())) return;
+    await registrar([{ tipo: TIPOS.RECEBIMENTO_EXCLUIDO, pessoaId: e.pessoaId, emprestimoId: e.id, dados: { recebimentoId: r.id } }]);
+    toast('Recebimento excluído');
+    ir('detalhe', { emprestimoId: e.id }, { substituir: true });
+  }));
+
+  const f = $('#form-receber');
+  const abrir = $('#b-receber');
+  if (abrir) abrir.onclick = () => { f.hidden = false; abrir.hidden = true; $('#p-valor').focus(); };
+  $('#p-cancelar').onclick = () => { f.hidden = true; if (abrir) abrir.hidden = false; $('#p-erro').hidden = true; };
+  f.addEventListener('click', ev => { const c = ev.target.closest('[data-valor]'); if (c) { $('#p-data').value = hojeISO(); $('#p-valor').value = centavosParaCampo(Number(c.dataset.valor)); } });
+  const fp = $('#form-parcelar'), bp = $('#b-parcelar');
+  if (fp && bp) {
+    const hoje = hojeISO();
+    const rp = ligarParcelas(fp, 'rp', () => ({ valor: x.saldoCentavos, data: hoje }), q => {
+      $('#rp-total').textContent = q.n ? fmtR$(q.total) : '—';
+      $('#rp-ultima').textContent = fmtData(q.ultima);
+      $('#rp-juros-info').textContent = q.n && q.vp ? `${fmtR$(q.juros)} (${fmtPct(q.jurosMensalPct)}% ao mês) · ${q.n}× de ${fmtR$(q.vp)}` : '—';
+    });
+    bp.onclick = () => { fp.hidden = false; bp.hidden = true; if (abrir) abrir.hidden = true; f.hidden = true; rp.atualizar(); fp.querySelector('#rp-nparc').focus(); };
+    $('#rp-cancelar').onclick = () => { fp.hidden = true; bp.hidden = false; if (abrir) abrir.hidden = false; };
+    fp.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const q = rp.ler(); const erro = $('#rp-erro');
+      const problemas = validarParcelas(q, hoje);
+      if (problemas.length) { erro.textContent = problemas.join(' '); erro.hidden = false; return; }
+      $('#rp-salvar').disabled = true;
+      try {
+        const novoId = uuid();
+        await registrar([
+          { tipo: TIPOS.DIVIDA_PARCELADA, pessoaId: e.pessoaId, emprestimoId: e.id,
+            dados: { data: hoje, saldoCentavos: x.saldoCentavos, novoEmprestimoId: novoId, numeroParcelas: q.n, valorParcelaCentavos: q.vp } },
+          { tipo: TIPOS.EMPRESTIMO_CRIADO, pessoaId: e.pessoaId, emprestimoId: novoId,
+            dados: { nomePessoa: e.nomePessoa, moeda: 'BRL', valorCentavos: x.saldoCentavos, dataEmprestimo: hoje, origemEmprestimoId: e.id, ...dadosParcelado(q), observacoes: '' } },
+        ]);
+        toast(`Dívida parcelada em ${q.n}× de ${fmtR$(q.vp)}`);
+        ir('detalhe', { emprestimoId: novoId }, { substituir: true });
+      } catch (err) {
+        erro.textContent = 'Não foi possível salvar. Tente de novo.'; erro.hidden = false;
+        $('#rp-salvar').disabled = false; console.error(err);
+      }
+    });
+  }
+  f.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const erro = $('#p-erro');
+    const vTxt = $('#p-valor').value, pTxt = $('#p-perdao').value;
+    const valor = lerReais(vTxt) ?? 0, perdao = lerReais(pTxt) ?? 0;
+    const data = $('#p-data').value;
+    const problemas = [];
+    if ((vTxt.trim() && lerReais(vTxt) === null) || (pTxt.trim() && lerReais(pTxt) === null)) problemas.push('Confira os valores digitados.');
+    else if (!valor && !perdao) problemas.push('Informe o valor recebido ou o valor a perdoar.');
+    if (!data) problemas.push('Informe a data.');
+    else if (data < e.dataEmprestimo) problemas.push('A data não pode ser antes do empréstimo.');
+    else if (data > hojeISO()) problemas.push('A data não pode ser no futuro.');
+    if (!problemas.length) {
+      // Saldo naquela data, considerando os lançamentos já feitos até ela
+      const naData = extrato({ ...e, recebimentos: e.recebimentos.filter(r => r.data <= data) }, data, renovarPadrao);
+      if (valor + perdao > naData.saldoCentavos) problemas.push(`Em ${fmtData(data)} o saldo era ${fmtR$(naData.saldoCentavos)}. Recebido mais perdoado não pode passar disso.`);
+    }
+    if (problemas.length) { erro.textContent = problemas.join(' '); erro.hidden = false; return; }
+    $('#p-salvar').disabled = true;
+    try {
+      await registrar([{ tipo: TIPOS.RECEBIMENTO, pessoaId: e.pessoaId, emprestimoId: e.id, dados: { valorCentavos: valor, perdaoCentavos: perdao, data } }]);
+      toast([valor ? `Recebido ${fmtR$(valor)}` : '', perdao ? `perdoado ${fmtR$(perdao)}` : ''].filter(Boolean).join(', '));
+      ir('detalhe', { emprestimoId: e.id }, { substituir: true });
+    } catch (err) {
+      erro.textContent = 'Não foi possível salvar. Tente de novo.'; erro.hidden = false;
+      $('#p-salvar').disabled = false; console.error(err);
+    }
+  });
+}
+
+async function telaAjustes() {
+  cabecalho('Ajustes', 'Padrões, tela inicial e backup', true);
+  const movs = await lerTodas();
+  const pendentes = movs.filter(m => !m.sincronizado).length;
+  const pad = await padroes();
+  const ci = await configInicio();
+  const seg = await seguranca();
+  const bioOk = await digitalDisponivel();
+  const conta = await contaGoogle();
+  $('#view').innerHTML = `
+    <div class="card" id="cfg-google">
+      <h2>Conta Google e backup</h2>
+      ${!googleAtivo() ? '<div class="sub">Entrar com Google e guardar o backup no seu Google Drive funciona no app publicado.</div>'
+      : conta ? `<div class="sub">Conectado como <b>${esc(conta.email)}</b>. Cada lançamento vai para o arquivo “${esc(ARQUIVO_BACKUP)}” no seu Google Drive.</div>
+        <div class="sub" id="g-estado">Último backup: ${fmtQuando(conta.ultimoBackup)}${pendentes ? ` · ${plural(pendentes, 'lançamento pendente', 'lançamentos pendentes')}` : ''}</div>
+        <button type="button" class="btn ghost" id="g-agora">Fazer backup agora</button>
+        <div class="discreto"><button type="button" class="mini" id="g-sair">Sair da conta Google</button></div>`
+      : `<div class="sub">Entre com sua conta Google para guardar uma cópia de tudo no seu Google Drive. Num celular novo, é só entrar de novo para recuperar.</div>
+        <button type="button" class="btn" id="g-entrar">Entrar com Google</button>`}
+    </div>
+    <form class="card" id="form-ajustes" novalidate>
+      <h2>Valores padrão</h2>
+      <div class="row2">
+        <div class="field"><label for="a-juros">Juros padrão (%)</label><input id="a-juros" type="number" inputmode="decimal" min="0" step="0.5" value="${pad.jurosPct}"></div>
+        <div class="field"><label for="a-prazo">Prazo padrão (dias)</label><input id="a-prazo" type="number" inputmode="numeric" min="0" step="1" value="${pad.prazoDias}"></div>
+      </div>
+      <div class="field">
+        <label for="a-multa">Valor por dia vencido (R$)</label>
+        <input id="a-multa" class="money" inputmode="decimal" autocomplete="off" value="${centavosParaCampo(pad.multaDiaCentavos)}">
+        <div class="hint">Usado nos próximos empréstimos. Os já registrados mantêm o valor com que foram feitos.</div>
+      </div>
+      <label class="toggle" for="a-renovar"><input type="checkbox" id="a-renovar" ${pad.renovarJuros ? 'checked' : ''}>
+        <span>Renovar juros se vencer sem quitar<br><span class="hint">A cada novo prazo sem pagamento total, entram os juros de novo sobre o que falta. Vale para os próximos empréstimos.</span></span></label>
+      <button class="btn" type="submit">Salvar padrões</button>
+    </form>
+    <div class="card" id="cfg-seg">
+      <h2>Segurança</h2>
+      ${seg ? `<div class="sub">O app pede o PIN ao abrir e quando volta depois de 1 minuto fora.</div>
+        <label class="toggle" for="s-digital"><input type="checkbox" id="s-digital" ${seg.digitalId ? 'checked' : ''} ${bioOk ? '' : 'disabled'}>
+          <span>Desbloquear com a digital<br><span class="hint">${bioOk ? 'Usa a digital ou o rosto cadastrado no celular. O PIN continua valendo.' : 'Este aparelho ou navegador não oferece digital aqui. Funciona no app instalado.'}</span></span></label>
+        <div class="row2"><button type="button" class="btn ghost" id="s-trocar">Trocar PIN</button><button type="button" class="btn ghost" id="s-remover">Remover PIN</button></div>`
+      : `<div class="sub">Proteja o app com um PIN de 4 a 6 números. Depois você pode liberar a digital.</div>
+        <button type="button" class="btn" id="s-criar">Criar PIN</button>`}
+    </div>
+    <div class="card" id="cfg-inicio">
+      <h2>Tela inicial</h2>
+      <div class="sub">Escolha o que aparece no Início.</div>
+      ${[['hoje', 'A receber hoje e atrasos'], ['emprestado', 'Total emprestado'], ['operacoes', 'Operações nos últimos 30 dias'], ['receber', 'A receber no mês'], ['ultimos', 'Últimos empréstimos']].map(([k, r]) =>
+        `<label class="toggle" for="ci-${k}"><input type="checkbox" id="ci-${k}" data-ci="${k}" ${ci[k] ? 'checked' : ''}><span>${r}</span></label>`).join('')}
+      <div class="field"><span class="label" id="l-qtd"><b>Quantos últimos empréstimos mostrar</b></span>
+        <div class="chips" role="group" aria-labelledby="l-qtd">${[3, 5, 10].map(n => `<button type="button" class="chip" data-qtd="${n}" aria-pressed="${ci.qtdUltimos === n}">${n}</button>`).join('')}</div></div>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
+      <p class="sub" style="margin:0">${fmtNum(movs.length)} movimentações guardadas neste celular. Também dá para guardar uma cópia manual em arquivo.</p>
+      <div class="stack">
+        <button class="btn ghost" id="b-baixar" ${window.__PWA__ ? '' : 'hidden'}>Baixar arquivo de backup</button>
+        <button class="btn ghost" id="b-copiar">Copiar backup</button>
+      </div>
+      <pre class="backup" id="b-texto" hidden></pre>
+    </div>`;
+  $('#form-ajustes').addEventListener('submit', async e => {
+    e.preventDefault();
+    const j = Number($('#a-juros').value), p = Math.floor(Number($('#a-prazo').value));
+    const m = lerReais($('#a-multa').value);
+    if ($('#a-juros').value === '' || isNaN(j) || j < 0 || $('#a-prazo').value === '' || isNaN(p) || p < 0 || m === null) return toast('Use números iguais ou maiores que zero');
+    await metaSet('jurosPadrao', j); await metaSet('prazoPadrao', p); await metaSet('multaDiaPadraoCentavos', m);
+    await metaSet('renovarJuros', $('#a-renovar').checked);
+    toast('Padrões salvos');
+  });
+  const recarregar = () => ir('ajustes', {}, { substituir: true });
+  $('#g-entrar')?.addEventListener('click', async () => { if (await entrarComGoogle()) recarregar(); });
+  $('#g-agora')?.addEventListener('click', async ev => {
+    ev.target.disabled = true; $('#g-estado').textContent = 'Fazendo backup…';
+    const r = await sincronizarDrive();
+    toast(r.ok ? (r.importadas ? `Backup feito. ${plural(r.importadas, 'lançamento novo veio', 'lançamentos novos vieram')} do Drive.` : 'Backup feito') : 'Não foi possível fazer o backup agora');
+    recarregar();
+  });
+  $('#g-sair')?.addEventListener('click', async () => {
+    if (!(await confirmar({ titulo: 'Sair da conta Google?', texto: 'Os dados continuam neste celular e no seu Drive. Os próximos lançamentos não vão para o backup até você entrar de novo.', botao: 'Sair' }))) return;
+    await sairDoGoogle(); toast('Conta Google desconectada'); recarregar();
+  });
+  $('#s-criar')?.addEventListener('click', async () => { if (await criarPin()) { toast('PIN criado'); recarregar(); } });
+  $('#s-trocar')?.addEventListener('click', async () => {
+    if (!(await confirmarPinAtual('Trocar PIN'))) return;
+    if (await criarPin()) { toast('PIN trocado'); recarregar(); }
+  });
+  $('#s-remover')?.addEventListener('click', async () => {
+    if (!(await confirmarPinAtual('Remover PIN'))) return;
+    await metaSet('seguranca', null); toast('PIN removido'); recarregar();
+  });
+  $('#s-digital')?.addEventListener('change', async ev => {
+    const s = await seguranca();
+    if (ev.target.checked) {
+      try { s.digitalId = await registrarDigital(); await metaSet('seguranca', s); toast('Digital ativada'); }
+      catch (_) { ev.target.checked = false; toast('Não foi possível ativar a digital'); }
+    } else { s.digitalId = null; await metaSet('seguranca', s); toast('Digital desativada'); }
+  });
+  const salvarInicio = async () => { await metaSet('telaInicial', { ...ci }); toast('Tela inicial atualizada'); };
+  $('#cfg-inicio').addEventListener('change', ev => { const k = ev.target.dataset.ci; if (k) { ci[k] = ev.target.checked; salvarInicio(); } });
+  $('#cfg-inicio').addEventListener('click', ev => {
+    const c = ev.target.closest('[data-qtd]'); if (!c) return;
+    ci.qtdUltimos = Number(c.dataset.qtd);
+    document.querySelectorAll('[data-qtd]').forEach(b => b.setAttribute('aria-pressed', String(b === c)));
+    salvarInicio();
+  });
+  const conteudo = () => JSON.stringify({ app: 'controle-emprestimos', exportadoEm: new Date().toISOString(), movimentacoes: movs }, null, 1);
+  $('#b-baixar').onclick = () => {
+    const url = URL.createObjectURL(new Blob([conteudo()], { type: 'application/json' }));
+    const a = document.createElement('a'); a.href = url; a.download = `backup-emprestimos-${hojeISO()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  $('#b-copiar').onclick = () => {
+    const txt = conteudo(); const pre = $('#b-texto');
+    const mostrar = () => {
+      pre.textContent = txt; pre.hidden = false;
+      const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      toast('Selecione e copie o texto abaixo');
+    };
+    if (!navigator.clipboard) return mostrar();
+    navigator.clipboard.writeText(txt).then(() => toast('Backup copiado'), mostrar);
+  };
+}
+
+document.addEventListener('click', e => {
+  const go = e.target.closest('[data-go]'); if (go) return ir(go.dataset.go, {}, { raiz: go.closest('nav') !== null || go.dataset.go === 'inicio' });
+  const h = e.target.closest('[data-hist]');
+  if (h) { const k = h.dataset.hist; return ir('historico', { filtro: k === 'emprestimos' ? { tipo: 'emprestimos', periodo: 'tudo' } : k === '30dias' ? { tipo: 'tudo', periodo: '30dias' } : k === 'areceber' ? { tipo: 'areceber' } : {} }); }
+  const pe = e.target.closest('[data-pessoa]'); if (pe) return ir('pessoa', { pessoaId: pe.dataset.pessoa });
+  const ab = e.target.closest('[data-abrir]'); if (ab) return ir('detalhe', { emprestimoId: ab.dataset.abrir });
+});
+
+(async function iniciar() {
+  try {
+    db = await abrirBanco();
+  } catch (err) {
+    console.warn('IndexedDB indisponível', err);
+    avisoArmazenamento = 'Este navegador não permite guardar dados. O que você registrar agora será perdido ao fechar.';
+  }
+  try {
+    if (!(await metaGet('dispositivoId'))) await metaSet('dispositivoId', uuid());
+  } catch (err) { console.warn(err); }
+  try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch (_) {}
+  try { if ('serviceWorker' in navigator && location.protocol !== 'file:' && window.__PWA__) navigator.serviceWorker.register('sw.js'); } catch (_) {}
+  await desbloquear();
+  ir('inicio', {}, { raiz: true });
+})();
+</script>
