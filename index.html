@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Empréstimos">
-<script>window.__PWA__ = true; window.__CONFIG__ = {"googleClientId":"527166921258-peis1qpi6h7ruat6bp5lskkb9sfge9hj.apps.googleusercontent.com"}; window.__BUILD__ = '2026-10-02T18:32:00.724Z';</script>
+<script>window.__PWA__ = true; window.__CONFIG__ = {"googleClientId":"527166921258-peis1qpi6h7ruat6bp5lskkb9sfge9hj.apps.googleusercontent.com"}; window.__BUILD__ = '2026-10-02T20:20:03.010Z';</script>
 </head>
 <body>
 <title>Controle de Empréstimos</title>
@@ -219,6 +219,10 @@ body.travado { overflow: hidden; }
 .lock-actions { display: grid; gap: 8px; width: 100%; margin-top: 8px; }
 
 /* Ações discretas e confirmação */
+.sug-wrap { position: relative; }
+.sugestoes { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.sugestoes button { display: block; width: 100%; text-align: left; font: inherit; color: var(--ink); background: none; border: 0; border-radius: 8px; padding: 11px 12px; cursor: pointer; }
+.sugestoes button:hover, .sugestoes button:focus-visible { background: var(--field); }
 .discreto { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: .8rem; text-align: center; padding-block: 4px 8px; }
 .mini { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: .8rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .log .mini { margin-left: 6px; font-size: .75rem; }
@@ -287,7 +291,7 @@ pre.backup { max-height: 160px; overflow: auto; font-size: .7rem; background: va
    Valores em dinheiro são guardados em centavos (números inteiros).
    ========================================================================= */
 /* Versão do app: aumentar a cada publicação (e anotar em codigo/README.md › Versões). */
-const VERSAO_APP = '1.1.0';
+const VERSAO_APP = '1.2.0';
 const DB_NOME = 'controle-emprestimos';
 const DB_VERSAO = 1;
 const TIPOS = {
@@ -792,6 +796,7 @@ async function desbloquear() {
   });
   travado = false;
   if (r === 'extra' && googleAtivo()) await exigirPin();
+  backupAoDesbloquear();
 }
 /* Volta a pedir o PIN se o app ficou mais de 1 minuto em segundo plano. */
 let saiuEm = 0;
@@ -922,8 +927,13 @@ async function marcarSincronizadas(ids) {
 }
 
 /* Junta o que está no Drive com o que está no celular e deixa os dois lados iguais. */
-async function sincronizarDrive() {
+const tokenValido = () => !!(tokenGoogle && tokenGoogle.expira > Date.now() + 60000);
+async function pendentesBackup() { try { return (await lerTodas()).filter(m => !m.sincronizado).length; } catch (_) { return 0; } }
+
+/* silencioso: só usa o acesso ao Google que já está valendo; nunca abre a janela do Google. */
+async function sincronizarDrive({ silencioso = false } = {}) {
   if (!googleAtivo()) return { ok: false, motivo: 'indisponível' };
+  if (silencioso && !tokenValido()) return { ok: false, motivo: 'sem acesso agora' };
   if (sincronizando) await sincronizando.catch(() => {});
   const conta = await contaGoogle();
   if (!conta) return { ok: false, motivo: 'sem conta' };
@@ -958,11 +968,24 @@ async function sincronizarDrive() {
   try { return await sincronizando; } finally { sincronizando = null; }
 }
 
-/* Chamado depois de cada lançamento. O toque que gerou o lançamento ainda vale para o Google, se precisar renovar o acesso. */
+/* Backup sem atrapalhar o uso: depois de um lançamento, espera um tempo parado e envia em segundo plano,
+   só se o acesso ao Google ainda estiver valendo. Senão fica pendente e vai quando o app for desbloqueado
+   ou fechado. Ver também backupAoDesbloquear. */
 function agendarBackup() {
   if (!googleAtivo()) return;
   clearTimeout(timerBackup);
-  timerBackup = setTimeout(() => sincronizarDrive(), 600);
+  timerBackup = setTimeout(() => sincronizarDrive({ silencioso: true }), 20000);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && googleAtivo() && tokenValido()) { clearTimeout(timerBackup); sincronizarDrive({ silencioso: true }); }
+});
+/* Logo depois do PIN (o toque ainda vale para renovar o acesso ao Google sem bloqueio de janela):
+   envia o que ficou pendente, ou faz a conferência diária. */
+async function backupAoDesbloquear() {
+  if (!googleAtivo() || !(await contaGoogle())) return;
+  const conta = await contaGoogle();
+  const velho = !conta.ultimoBackup || Date.now() - Date.parse(conta.ultimoBackup) > 864e5;
+  if (await pendentesBackup() || velho) sincronizarDrive();
 }
 
 async function entrarComGoogle() {
@@ -1514,6 +1537,28 @@ const dadosParcelado = q => ({
   multaDiaCentavos: q.multaCentavos ?? 0, renovarJuros: false,
 });
 
+/* Sugestões de nomes já usados (o <datalist> não aparece em vários celulares Android). */
+function ligarSugestoes(campo, lista, nomes) {
+  const abrir = () => {
+    const t = normalizar(campo.value);
+    const achados = nomes.filter(n => !t || (normalizar(n).includes(t) && normalizar(n) !== t)).slice(0, 6);
+    lista.innerHTML = achados.map(n => `<li role="option"><button type="button" data-nome="${esc(n)}">${esc(n)}</button></li>`).join('');
+    lista.hidden = !achados.length; campo.setAttribute('aria-expanded', String(!lista.hidden));
+  };
+  const fechar = () => { lista.hidden = true; campo.setAttribute('aria-expanded', 'false'); };
+  campo.addEventListener('focus', abrir);
+  campo.addEventListener('input', abrir);
+  campo.addEventListener('blur', () => setTimeout(fechar, 150));
+  campo.addEventListener('keydown', ev => { if (ev.key === 'Escape') fechar(); });
+  // pointerdown escolhe antes de o campo perder o foco
+  lista.addEventListener('pointerdown', ev => {
+    const b = ev.target.closest('[data-nome]'); if (!b) return;
+    ev.preventDefault(); campo.value = b.dataset.nome; fechar();
+    campo.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  lista.addEventListener('click', ev => { const b = ev.target.closest('[data-nome]'); if (b) { campo.value = b.dataset.nome; fechar(); } });
+}
+
 async function telaNovo(editarId) {
   const { pessoas, emprestimos: todos } = projetar(await lerTodas());
   const ed = editarId ? todos.get(editarId) : null;
@@ -1531,8 +1576,10 @@ async function telaNovo(editarId) {
       </div>
       <div class="field">
         <label for="f-nome">Nome de quem recebeu</label>
-        <input id="f-nome" name="nome" list="lista-pessoas" autocomplete="off" autocapitalize="words" required placeholder="Ex.: Maria Souza">
-        <datalist id="lista-pessoas">${nomes.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+        <div class="sug-wrap">
+          <input id="f-nome" name="nome" autocomplete="off" autocapitalize="words" required placeholder="Ex.: Maria Souza" role="combobox" aria-autocomplete="list" aria-controls="f-sug" aria-expanded="false">
+          <ul class="sugestoes" id="f-sug" role="listbox" hidden></ul>
+        </div>
       </div>
       <div class="row2">
         <div class="field">
@@ -1628,6 +1675,7 @@ async function telaNovo(editarId) {
       $('#r-juros-parc-v').textContent = q.n && q.vp && q.valor ? `${fmtR$(q.juros)} (${fmtPct(q.jurosMensalPct)}% ao mês) · ${q.n}× de ${fmtR$(q.vp)}` : '—';
     } else $('#r-venc-t').textContent = 'Vencimento';
   };
+  ligarSugestoes($('#f-nome'), $('#f-sug'), nomes);
   parc = ligarParcelas($('#sec-parc'), 'np', () => ({ valor: lerReais(f.valor.value) ?? 0, data: f.dataEmprestimo.value }), () => atualizar('parc'));
   f.valor.addEventListener('input', () => { atualizar('valor'); if (tipo === 'parcelado') parc.atualizar(); });
   f.jurosPct.addEventListener('input', () => atualizar('juros'));
