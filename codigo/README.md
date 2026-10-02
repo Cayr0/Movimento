@@ -44,3 +44,8 @@ Config: `config.json` com `{ "googleClientId": "..." }` (público) é injetado p
 ## Contas separadas e código de ativação
 Cada e-mail Google tem o próprio banco no celular (`movimento--<email>`) e o próprio backup no Drive. O app abre numa tela de entrada (Google) e, se a conta ainda não estiver ativada, pede o código de ativação. O código é uma assinatura ECDSA P-256 de `movimento:v1:<email>`, em base64url; o app tem só a chave pública (`CHAVE_LICENCA`) e confere sem internet. Link de ativação: `<endereço do app>#ativar=<código>`. O código fica guardado no celular (localStorage `movimento.licencas`) e vai junto no backup do Drive, então num celular novo basta entrar com o Google. "Trocar de conta" fica em Ajustes. Os lançamentos do banco antigo (`controle-emprestimos`, de antes das contas) são oferecidos à primeira conta que entrar.
 A chave privada e a página geradora ficam fora do repositório, em `/mnt/project-files/licencas/` (não publicar). Limite: o app roda todo no navegador, então quem souber programar consegue copiar o código público e tirar a verificação; o código de ativação barra o uso comum, não um ataque.
+
+## Versões
+A versão aparece no rodapé de Ajustes (`VERSAO_APP` em `src/app.html`, mais a data da publicação injetada pelo build). Aumente a cada publicação e anote aqui.
+- 1.1.0 (02/10/2026): PIN obrigatório no primeiro acesso de cada conta (e depois de "Esqueci o PIN"), com opção de digital; versão no rodapé de Ajustes.
+- 1.0.0 (02/10/2026): contas separadas por e-mail, código de ativação, backup no Google Drive, CSV, a receber hoje.

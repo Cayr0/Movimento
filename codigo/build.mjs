@@ -1,7 +1,9 @@
 // Gera dist/ (versão instalável PWA) a partir de src/app.html.
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 const app = readFileSync('src/app.html', 'utf8');
-const versao = new Date().toISOString();
+const app0 = readFileSync('src/app.html', 'utf8');
+const versaoApp = (app0.match(/const VERSAO_APP = '([^']+)'/) || [])[1] || '0';
+const versao = `${versaoApp}-${new Date().toISOString()}`;
 // config.json (opcional): { "googleClientId": "...apps.googleusercontent.com" }. O Client ID é público, pode ir no site.
 const config = existsSync('config.json') ? JSON.parse(readFileSync('config.json', 'utf8')) : {};
 const html = `<!doctype html>
@@ -14,7 +16,7 @@ const html = `<!doctype html>
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Empréstimos">
-<script>window.__PWA__ = true; window.__CONFIG__ = ${JSON.stringify(config)};</script>
+<script>window.__PWA__ = true; window.__CONFIG__ = ${JSON.stringify(config)}; window.__BUILD__ = '${new Date().toISOString()}';</script>
 </head>
 <body>
 ${app}

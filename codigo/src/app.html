@@ -273,6 +273,8 @@ pre.backup { max-height: 160px; overflow: auto; font-size: .7rem; background: va
    para que a sincronização com a nuvem envie apenas o que falta.
    Valores em dinheiro são guardados em centavos (números inteiros).
    ========================================================================= */
+/* Versão do app: aumentar a cada publicação (e anotar em codigo/README.md › Versões). */
+const VERSAO_APP = '1.1.0';
 const DB_NOME = 'controle-emprestimos';
 const DB_VERSAO = 1;
 const TIPOS = {
@@ -763,7 +765,7 @@ async function desbloquear() {
   const s = await seguranca();
   if (!s || travado) return;
   travado = true;
-  await teclado({
+  const r = await teclado({
     titulo: 'Digite seu PIN', sub: 'Controle de Empréstimos', tamanho: s.tamanho, cancelavel: false,
     digital: s.digitalId ? () => verificarDigital(s.digitalId) : null,
     extra: googleAtivo() && (await contaGoogle()) ? { rotulo: 'Esqueci o PIN', acao: recuperarPinPeloGoogle, falha: 'Não foi possível confirmar pela conta Google.' } : null,
@@ -776,6 +778,7 @@ async function desbloquear() {
     },
   });
   travado = false;
+  if (r === 'extra' && googleAtivo()) await exigirPin();
 }
 /* Volta a pedir o PIN se o app ficou mais de 1 minuto em segundo plano. */
 let saiuEm = 0;
@@ -784,15 +787,25 @@ document.addEventListener('visibilitychange', async () => {
   if (saiuEm && Date.now() - saiuEm > 60000 && await seguranca()) desbloquear();
 });
 
-async function criarPin() {
+async function criarPin({ obrigatorio = false, titulo = 'Crie um PIN', sub = 'De 4 a 6 números' } = {}) {
   if (!pinSuportado()) { toast('Este navegador não permite PIN'); return false; }
-  const novo = await teclado({ titulo: 'Crie um PIN', sub: 'De 4 a 6 números' });
+  const novo = await teclado({ titulo, sub, cancelavel: !obrigatorio });
   if (!novo) return false;
-  const conf = await teclado({ titulo: 'Confirme o PIN', sub: 'Digite de novo', tamanho: novo.length, validar: p => p === novo || 'Os PINs não batem. Tente de novo.' });
+  const conf = await teclado({ titulo: 'Confirme o PIN', sub: 'Digite de novo', tamanho: novo.length, cancelavel: !obrigatorio, validar: p => p === novo || 'Os PINs não batem. Tente de novo.' });
   if (!conf) return false;
   const salt = b64(aleatorio(16));
   const atual = await seguranca();
   await metaSet('seguranca', { salt, hash: await hashPin(novo, salt), tamanho: novo.length, digitalId: atual?.digitalId || null });
+  return true;
+}
+/* Toda conta precisa de PIN: no primeiro acesso (ou depois de "Esqueci o PIN") o app só segue depois de criar um. */
+async function exigirPin() {
+  if (!pinSuportado() || await seguranca()) return false;
+  while (!(await criarPin({ obrigatorio: true, titulo: 'Crie um PIN para esta conta', sub: 'Ele protege o app. De 4 a 6 números.' }))) { /* repete até criar */ }
+  if (await digitalDisponivel() && await confirmar({ titulo: 'Usar a digital também?', texto: 'Desbloqueie com a digital ou o rosto cadastrado no celular. O PIN continua valendo.', botao: 'Usar digital' })) {
+    try { const s = await seguranca(); s.digitalId = await registrarDigital(); await metaSet('seguranca', s); toast('PIN criado e digital ativada'); }
+    catch (_) { toast('PIN criado. A digital não foi ativada; tente depois em Ajustes.'); }
+  } else toast('PIN criado');
   return true;
 }
 async function confirmarPinAtual(titulo) {
@@ -1946,7 +1959,8 @@ async function telaAjustes() {
       ${seg ? `<div class="sub">O app pede o PIN ao abrir e quando volta depois de 1 minuto fora.</div>
         <label class="toggle" for="s-digital"><input type="checkbox" id="s-digital" ${seg.digitalId ? 'checked' : ''} ${bioOk ? '' : 'disabled'}>
           <span>Desbloquear com a digital<br><span class="hint">${bioOk ? 'Usa a digital ou o rosto cadastrado no celular. O PIN continua valendo.' : 'Este aparelho ou navegador não oferece digital aqui. Funciona no app instalado.'}</span></span></label>
-        <div class="row2"><button type="button" class="btn ghost" id="s-trocar">Trocar PIN</button><button type="button" class="btn ghost" id="s-remover">Remover PIN</button></div>`
+        ${googleAtivo() ? '<button type="button" class="btn ghost" id="s-trocar">Trocar PIN</button>'
+          : '<div class="row2"><button type="button" class="btn ghost" id="s-trocar">Trocar PIN</button><button type="button" class="btn ghost" id="s-remover">Remover PIN</button></div>'}`
       : `<div class="sub">Proteja o app com um PIN de 4 a 6 números. Depois você pode liberar a digital.</div>
         <button type="button" class="btn" id="s-criar">Criar PIN</button>`}
     </div>
@@ -1973,7 +1987,8 @@ async function telaAjustes() {
         <textarea id="b-colar-txt" rows="4" placeholder="Cole aqui o texto do backup" aria-label="Texto do backup"></textarea>
         <button type="button" class="btn ghost" id="b-colar-ok">Restaurar</button>
       </div>
-    </div>`;
+    </div>
+    <div class="discreto versao">Movimento · versão ${VERSAO_APP}${window.__BUILD__ ? ` · publicada em ${fmtData(window.__BUILD__.slice(0, 10))}` : ''}</div>`;
   $('#form-ajustes').addEventListener('submit', async e => {
     e.preventDefault();
     const j = Number($('#a-juros').value), p = Math.floor(Number($('#a-prazo').value));
@@ -2076,6 +2091,7 @@ document.addEventListener('click', e => {
     const conta = await contaGoogle();
     if (conta?.email !== email) await metaSet('google', { email, conectadoEm: new Date().toISOString() });
     await migrarBancoAntigo(email);
+    if (await exigirPin()) { ir('inicio', {}, { raiz: true }); if (tokenGoogle) sincronizarDrive(); return; }
     if (tokenGoogle) sincronizarDrive().then(r => { if (r.ok && r.importadas) { toast(`${plural(r.importadas, 'lançamento veio', 'lançamentos vieram')} do backup`); if (estado.tela === 'inicio') ir('inicio', {}, { raiz: true }); } });
   }
   await desbloquear();
