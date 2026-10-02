@@ -1,5 +1,5 @@
-// Cache para funcionar offline. Versão: 1.2.0-2026-10-02T20:20:02.910Z
-const CACHE = 'emprestimos-1.2.0-2026-10-02T20:20:02.910Z';
+// Cache para funcionar offline. Versão: 1.3.0-2026-10-02T20:32:11.400Z
+const CACHE = 'emprestimos-1.3.0-2026-10-02T20:32:11.400Z';
 const ARQUIVOS = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

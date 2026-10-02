@@ -47,6 +47,7 @@ A chave privada e a página geradora ficam fora do repositório, em `/mnt/projec
 
 ## Versões
 A versão aparece no rodapé de Ajustes (`VERSAO_APP` em `src/app.html`, mais a data da publicação injetada pelo build). Aumente a cada publicação e anote aqui.
+- 1.3.0 (02/10/2026): "Ir"/Enter do teclado passa para o próximo campo e nunca salva (só o botão salva); botão voltar do celular volta de tela, fecha janelas abertas, vai para o Início e só sai do app com dois toques seguidos.
 - 1.2.0 (02/10/2026): sugestões de nomes próprias (o datalist não aparecia no Android); backup não roda mais ao salvar: vai 20 s depois em segundo plano (se o acesso ao Google estiver valendo), ao fechar o app e logo após o PIN.
 - 1.1.0 (02/10/2026): PIN obrigatório no primeiro acesso de cada conta (e depois de "Esqueci o PIN"), com opção de digital; versão no rodapé de Ajustes.
 - 1.0.0 (02/10/2026): contas separadas por e-mail, código de ativação, backup no Google Drive, CSV, a receber hoje.
