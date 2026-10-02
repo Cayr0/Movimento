@@ -189,6 +189,8 @@ details.acc .acc-body { display: grid; gap: 14px; padding: 0 14px 14px; }
 .lock { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
 body.travado { overflow: hidden; }
 .lock-box { width: 100%; max-width: 320px; display: grid; justify-items: center; gap: 12px; text-align: center; }
+.lock-box.entrada .btn, .lock-box.entrada textarea { width: 100%; }
+.lock-box.entrada b { overflow-wrap: anywhere; }
 .lock-sub { min-height: 1.2em; }
 .dots { display: flex; gap: 14px; height: 18px; align-items: center; }
 .dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); }
@@ -292,10 +294,10 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
 let db = null;
 let memoria = { movimentacoes: [], meta: {} }; // usado se o IndexedDB não estiver disponível
 
-function abrirBanco() {
+function abrirBanco(nome = DB_NOME) {
   return new Promise((resolve, reject) => {
     if (!('indexedDB' in window)) return reject(new Error('sem indexedDB'));
-    const req = indexedDB.open(DB_NOME, DB_VERSAO);
+    const req = indexedDB.open(nome, DB_VERSAO);
     req.onupgradeneeded = () => {
       const d = req.result;
       const mov = d.createObjectStore('movimentacoes', { keyPath: 'id' });
@@ -910,7 +912,9 @@ async function sincronizarDrive() {
       const noDrive = new Set(remotas.map(m => m?.id));
       const enviadas = locais.filter(m => !noDrive.has(m.id)).length;
       if (enviadas || !id) {
+        const codigo = licencasLocais()[conta.email];
         const corpo = JSON.stringify({ app: 'controle-emprestimos', conta: conta.email, exportadoEm: new Date().toISOString(),
+          licenca: codigo ? { email: conta.email, codigo } : undefined,
           movimentacoes: locais.map(({ sincronizado, ...m }) => m) });
         if (id) await googleApi(`${DRIVE_UPLOAD}/${id}?uploadType=media`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: corpo });
         else {
@@ -969,6 +973,134 @@ async function recuperarPinPeloGoogle() {
 }
 
 const fmtQuando = iso => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'nunca';
+
+/* ---------- Contas separadas e código de ativação ----------
+   Cada e-mail Google tem o próprio banco neste celular ("movimento--<email>") e o próprio backup no Drive.
+   Para usar o app, a conta precisa de um código de ativação: uma assinatura ECDSA do e-mail feita pelo
+   dono do app com a chave privada. O app só tem a chave pública, então confere sem internet e não consegue
+   gerar códigos. O código vai junto no backup do Drive, para não pedir de novo num celular novo. */
+const CHAVE_LICENCA = {"kty":"EC","crv":"P-256","x":"DHNcV-aF6W63h1pfHQUdKDyPJv7IBZGi5J4XHAwWu2U","y":"3mhLnJFpDIeYsT404nv33WGsH-z_ysrE6ME6KlpGPt0"};
+const LS = {
+  get: k => { try { return localStorage.getItem('movimento.' + k); } catch (_) { return null; } },
+  set: (k, v) => { try { localStorage.setItem('movimento.' + k, v); } catch (_) {} },
+  del: k => { try { localStorage.removeItem('movimento.' + k); } catch (_) {} },
+};
+const nomeBancoConta = email => 'movimento--' + email;
+const limparCodigo = c => String(c || '').replace(/[^A-Za-z0-9_-]/g, '');
+const licencasLocais = () => { try { return JSON.parse(LS.get('licencas') || '{}'); } catch (_) { return {}; } };
+function guardarLicenca(email, codigo) { LS.set('licencas', JSON.stringify({ ...licencasLocais(), [email]: limparCodigo(codigo) })); }
+
+async function licencaValida(email, codigo) {
+  try {
+    const cod = limparCodigo(codigo); if (!email || cod.length < 80) return false;
+    const assinatura = Uint8Array.from(atob(cod.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const chave = await crypto.subtle.importKey('jwk', CHAVE_LICENCA, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    return await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, chave, assinatura, new TextEncoder().encode('movimento:v1:' + email.trim().toLowerCase()));
+  } catch (_) { return false; }
+}
+
+/* Link de ativação: ...#ativar=CODIGO. Guarda o código até a pessoa entrar com o Google. */
+function capturarCodigoDaUrl() {
+  const m = location.hash.match(/ativar=([A-Za-z0-9_-]+)/);
+  if (!m) return;
+  LS.set('codigoPendente', m[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+window.addEventListener('hashchange', () => {
+  capturarCodigoDaUrl();
+  const campo = document.getElementById('e-codigo');
+  if (campo && LS.get('codigoPendente')) { campo.value = LS.get('codigoPendente'); document.getElementById('e-ativar')?.click(); }
+});
+
+async function licencaNoDrive() {
+  try {
+    const id = await arquivoNoDrive(); if (!id) return null;
+    return (await (await googleApi(`${DRIVE}/${id}?alt=media`)).json())?.licenca?.codigo || null;
+  } catch (_) { return null; }
+}
+
+/* Tela de entrada: Google primeiro, depois o código se a conta ainda não estiver ativada. Devolve o e-mail. */
+function telaEntrada() {
+  return new Promise(resolve => {
+    const el = $('#lock');
+    let email = null;
+    document.body.classList.add('travado'); el.hidden = false;
+    const logo = '<svg width="52" height="52" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="#f2b705"/><text x="32" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800" font-size="22" fill="#1f2328">R$</text></svg>';
+    const passoLogin = (erro = '') => {
+      el.innerHTML = `<div class="lock-box entrada">${logo}
+        <h2>Movimento</h2>
+        <div class="sub lock-sub">Controle de empréstimos. Entre com sua conta Google: cada conta tem os próprios empréstimos e o próprio backup no seu Google Drive.</div>
+        <button type="button" class="btn" id="e-google">Entrar com Google</button>
+        <div class="err lock-err" role="alert">${esc(erro)}</div></div>`;
+      $('#e-google').onclick = entrar;
+    };
+    const passoCodigo = (erro = '') => {
+      el.innerHTML = `<div class="lock-box entrada">${logo}
+        <h2>Ativar o app</h2>
+        <div class="sub lock-sub">Conta <b>${esc(email)}</b>. Cole o código de ativação que você recebeu, ou abra o link de ativação neste celular.</div>
+        <textarea id="e-codigo" rows="3" placeholder="Código de ativação" aria-label="Código de ativação" autocomplete="off" spellcheck="false"></textarea>
+        <button type="button" class="btn" id="e-ativar">Ativar</button>
+        <div class="err lock-err" role="alert">${esc(erro)}</div>
+        <div class="discreto"><button type="button" class="mini" id="e-outra">Entrar com outra conta</button></div></div>`;
+      $('#e-ativar').onclick = async () => {
+        const c = $('#e-codigo').value;
+        if (await licencaValida(email, c)) return pronto(c);
+        passoCodigo('Este código não vale para ' + email + '. Confira se foi gerado para este e-mail.');
+      };
+      $('#e-outra').onclick = () => { email = null; tokenGoogle = null; passoLogin(); };
+    };
+    const pronto = codigo => {
+      guardarLicenca(email, codigo); LS.set('contaAtual', email);
+      if (limparCodigo(LS.get('codigoPendente')) === limparCodigo(codigo)) LS.del('codigoPendente');
+      el.hidden = true; el.innerHTML = ''; document.body.classList.remove('travado');
+      resolve(email);
+    };
+    async function entrar() {
+      const b = $('#e-google'); b.disabled = true; b.textContent = 'Entrando…';
+      try {
+        await tokenDoGoogle(null, { novo: true });
+        email = (await emailDoGoogle()).trim().toLowerCase();
+      } catch (_) { return passoLogin('Não foi possível entrar com o Google. Tente de novo.'); }
+      for (const c of [licencasLocais()[email], LS.get('codigoPendente'), await licencaNoDrive()])
+        if (c && await licencaValida(email, c)) return pronto(c);
+      passoCodigo();
+    }
+    passoLogin();
+  });
+}
+
+/* Conta atual já ativada neste celular? Senão, pede a entrada. */
+async function prepararConta() {
+  capturarCodigoDaUrl();
+  const atual = LS.get('contaAtual');
+  if (atual && await licencaValida(atual, licencasLocais()[atual])) return atual;
+  LS.del('contaAtual');
+  return telaEntrada();
+}
+
+function trocarDeConta() { LS.del('contaAtual'); tokenGoogle = null; location.reload(); }
+
+/* Lançamentos de antes das contas separadas (banco único): oferece trazer para a primeira conta que entrar. */
+async function migrarBancoAntigo(email) {
+  if (LS.get('antigo')) return;
+  try {
+    if (indexedDB.databases && !(await indexedDB.databases()).some(d => d.name === DB_NOME)) { LS.set('antigo', 'nenhum'); return; }
+    const antigo = await abrirBanco(DB_NOME);
+    const ler = store => new Promise((ok, falha) => { const r = antigo.transaction(store).objectStore(store).getAll(); r.onsuccess = () => ok(r.result); r.onerror = () => falha(r.error); });
+    const movs = await ler('movimentacoes'), metas = await ler('meta');
+    antigo.close();
+    if (!movs.length) { LS.set('antigo', 'vazio'); return; }
+    const sim = await confirmar({ titulo: 'Trazer os empréstimos anteriores?',
+      texto: `Este celular tem ${plural(movs.length, 'lançamento', 'lançamentos')} de antes das contas separadas. Trazer para ${email}? Se não, eles ficam guardados à parte.`, botao: 'Trazer' });
+    if (!sim) { LS.set('antigo', 'recusado'); return; }
+    await importarMovimentacoes(movs); await marcarPendentes(movs);
+    for (const { chave, valor } of metas)
+      if (['jurosPadrao', 'prazoPadrao', 'multaDiaPadraoCentavos', 'renovarJuros', 'telaInicial', 'seguranca'].includes(chave) && (await metaGet(chave)) === undefined) await metaSet(chave, valor);
+    LS.set('antigo', 'migrado:' + email);
+    toast(`${plural(movs.length, 'lançamento trazido', 'lançamentos trazidos')} para esta conta`);
+  } catch (err) { console.warn('migração', err); }
+}
 
 /* ---------- Home e histórico ---------- */
 const fimDoMes = iso => somarDias(somarMeses(iso.slice(0, 8) + '01', 1), -1);
@@ -1790,7 +1922,7 @@ async function telaAjustes() {
       : conta ? `<div class="sub">Conectado como <b>${esc(conta.email)}</b>. Cada lançamento vai para o arquivo “${esc(ARQUIVO_BACKUP)}” no seu Google Drive.</div>
         <div class="sub" id="g-estado">Último backup: ${fmtQuando(conta.ultimoBackup)}${pendentes ? ` · ${plural(pendentes, 'lançamento pendente', 'lançamentos pendentes')}` : ''}</div>
         <button type="button" class="btn ghost" id="g-agora">Fazer backup agora</button>
-        <div class="discreto"><button type="button" class="mini" id="g-sair">Sair da conta Google</button></div>`
+        <div class="discreto"><button type="button" class="mini" id="g-sair">Trocar de conta</button></div>`
       : `<div class="sub">Entre com sua conta Google para guardar uma cópia de tudo no seu Google Drive. Num celular novo, é só entrar de novo para recuperar.</div>
         <button type="button" class="btn" id="g-entrar">Entrar com Google</button>`}
     </div>
@@ -1860,8 +1992,8 @@ async function telaAjustes() {
     recarregar();
   });
   $('#g-sair')?.addEventListener('click', async () => {
-    if (!(await confirmar({ titulo: 'Sair da conta Google?', texto: 'Os dados continuam neste celular e no seu Drive. Os próximos lançamentos não vão para o backup até você entrar de novo.', botao: 'Sair' }))) return;
-    await sairDoGoogle(); toast('Conta Google desconectada'); recarregar();
+    if (!(await confirmar({ titulo: 'Trocar de conta?', texto: 'Os empréstimos desta conta continuam guardados neste celular e no Drive dela. Para voltar, é só entrar de novo com este e-mail.', botao: 'Trocar' }))) return;
+    trocarDeConta();
   });
   $('#s-criar')?.addEventListener('click', async () => { if (await criarPin()) { toast('PIN criado'); recarregar(); } });
   $('#s-trocar')?.addEventListener('click', async () => {
@@ -1928,8 +2060,9 @@ document.addEventListener('click', e => {
 });
 
 (async function iniciar() {
+  const email = googleAtivo() ? await prepararConta() : null;
   try {
-    db = await abrirBanco();
+    db = await abrirBanco(email ? nomeBancoConta(email) : DB_NOME);
   } catch (err) {
     console.warn('IndexedDB indisponível', err);
     avisoArmazenamento = 'Este navegador não permite guardar dados. O que você registrar agora será perdido ao fechar.';
@@ -1939,6 +2072,12 @@ document.addEventListener('click', e => {
   } catch (err) { console.warn(err); }
   try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch (_) {}
   try { if ('serviceWorker' in navigator && location.protocol !== 'file:' && window.__PWA__) navigator.serviceWorker.register('sw.js'); } catch (_) {}
+  if (email) {
+    const conta = await contaGoogle();
+    if (conta?.email !== email) await metaSet('google', { email, conectadoEm: new Date().toISOString() });
+    await migrarBancoAntigo(email);
+    if (tokenGoogle) sincronizarDrive().then(r => { if (r.ok && r.importadas) { toast(`${plural(r.importadas, 'lançamento veio', 'lançamentos vieram')} do backup`); if (estado.tela === 'inicio') ir('inicio', {}, { raiz: true }); } });
+  }
   await desbloquear();
   ir('inicio', {}, { raiz: true });
 })();
